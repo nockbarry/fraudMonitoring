@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stability & Calibration Monitoring · Fraud Demo v1</title>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>
+:root {
+  --sb-bg: #0f172a; --sb-bg-2: #1e293b; --sb-fg: #cbd5e1; --sb-dim: #64748b;
+  --accent: #6366f1; --accent-bg: rgba(99,102,241,0.16);
+  --bg: #f6f7fb; --card: #ffffff; --border: #e4e7ec;
+  --text: #0f172a; --dim: #64748b;
+  --good: #10b981; --warn: #f59e0b; --bad: #ef4444;
+  --invariant: #0ea5e9; --tactical: #f59e0b; --compositional: #a855f7;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  color: var(--text); background: var(--bg);
+  font-size: 14px; display: flex; overflow: hidden;
+}
+.sidebar { width: 280px; background: var(--sb-bg); color: var(--sb-fg); flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
+.sb-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--sb-bg-2); }
+.sb-title { font-size: 15px; font-weight: 700; color: #f1f5f9; margin: 0; display: flex; align-items: center; gap: 8px; }
+.sb-title::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); display: inline-block; }
+.sb-sub { font-size: 11px; color: var(--sb-dim); margin-top: 4px; letter-spacing: 0.4px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.sb-hublink { display: block; font-size: 11px; color: var(--sb-dim); padding: 8px 20px; text-decoration: none; border-bottom: 1px solid var(--sb-bg-2); }
+.sb-hublink:hover { color: var(--accent); }
+.sb-hublink .arrow { float: right; }
+.nav { flex: 1; overflow-y: auto; padding: 6px 0 10px; }
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.nav-section { margin-bottom: 1px; }
+.nav-head { display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 18px; cursor: pointer; user-select: none; font-size: 12.5px; font-weight: 600; color: #e2e8f0; }
+.nav-head:hover { background: rgba(255,255,255,0.04); }
+.nav-head .chev { margin-left: auto; color: var(--sb-dim); font-size: 9px; transition: transform 0.15s; }
+.nav-section.collapsed .chev { transform: rotate(-90deg); }
+.nav-section.collapsed .nav-items { display: none; }
+.nav-items { padding: 2px 0 6px; }
+.nav-item { display: flex; align-items: center; gap: 8px; padding: 6px 18px 6px 42px; cursor: pointer; font-size: 12.5px; color: var(--sb-fg); border-left: 2px solid transparent; }
+.nav-item:hover { background: rgba(255,255,255,0.04); color: #f1f5f9; }
+.nav-item.active { color: #f1f5f9; background: var(--accent-bg); border-left-color: var(--accent); font-weight: 500; }
+.nav-direct { padding: 9px 18px; cursor: pointer; font-size: 12.5px; color: #e2e8f0; font-weight: 600; border-left: 2px solid transparent; display: flex; gap: 10px; align-items: center; }
+.nav-direct:hover { background: rgba(255,255,255,0.04); }
+.nav-direct.active { background: var(--accent-bg); border-left-color: var(--accent); }
+.badge { font-size: 10px; padding: 1px 7px; border-radius: 10px; background: #334155; color: #cbd5e1; margin-left: auto; font-weight: 500; }
+.badge-accent { background: var(--accent-bg); color: #c7d2fe; }
+.badge-warn { background: #78350f; color: #fcd34d; }
+.badge-bad { background: #7f1d1d; color: #fca5a5; }
+.sb-foot { padding: 12px 18px; border-top: 1px solid var(--sb-bg-2); font-size: 11px; color: var(--sb-dim); }
+
+.content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 56px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 16px; flex-shrink: 0; }
+.crumbs { font-size: 13px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+.crumbs strong { color: var(--text); font-weight: 600; }
+.crumbs .sep { color: #cbd5e1; }
+.tr { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--dim); }
+.tstat { display: flex; gap: 5px; align-items: center; }
+.tstat strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tstat-sep { color: #cbd5e1; }
+.main { flex: 1; overflow-y: auto; padding: 22px 24px; }
+.main::-webkit-scrollbar { width: 8px; }
+.main::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+.page-h { margin-bottom: 18px; }
+.page-t { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.page-d { font-size: 13px; color: var(--dim); margin: 0; max-width: 880px; line-height: 1.55; }
+.page-d code { background: #eef2ff; color: #3730a3; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+.kpi { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 13px 16px; }
+.kpi-l { font-size: 11px; color: var(--dim); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px; }
+.kpi-v { font-size: 22px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.kpi-s { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+.kpi-accent { border-left: 3px solid var(--accent); }
+.kpi-warn { border-left: 3px solid var(--warn); }
+.kpi-bad { border-left: 3px solid var(--bad); }
+.kpi-good { border-left: 3px solid var(--good); }
+
+.chart-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; margin-bottom: 14px; }
+.chart-head { padding: 10px 14px 2px; }
+.chart-t { font-size: 13.5px; font-weight: 600; margin: 0; }
+.chart-s { font-size: 12px; color: var(--dim); margin-top: 2px; line-height: 1.45; }
+.chart-body { padding: 4px; }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 1100px) { .row2, .row3 { grid-template-columns: 1fr; } }
+
+.rt-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rt-tbl th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--dim); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border); letter-spacing: 0.4px; background: #f8fafc; }
+.rt-tbl td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
+.rt-tbl tr:last-child td { border-bottom: 0; }
+.rt-tbl .hl { background: #eef2ff; font-weight: 600; }
+
+.alert { display: flex; gap: 10px; padding: 10px 12px; border-left: 3px solid var(--warn); background: #fffbeb; border-radius: 4px; margin-bottom: 10px; font-size: 13px; line-height: 1.55; }
+.alert.bad { border-left-color: var(--bad); background: #fef2f2; }
+.alert.good { border-left-color: var(--good); background: #f0fdf4; }
+.alert.info { border-left-color: var(--accent); background: #eef2ff; }
+.alert strong { margin-right: 4px; }
+.alert code { background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+.sec-title { font-size: 12px; font-weight: 700; color: var(--dim); margin: 18px 0 10px; padding-top: 6px; border-top: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
+.sec-title:first-of-type { border-top: 0; padding-top: 0; margin-top: 6px; }
+
+.pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.pill-good { background: #d1fae5; color: #065f46; }
+.pill-warn { background: #fef3c7; color: #92400e; }
+.pill-bad { background: #fee2e2; color: #991b1b; }
+.pill-accent { background: #e0e7ff; color: #3730a3; }
+.pill-inv { background: #e0f2fe; color: #075985; }
+.pill-tac { background: #fef3c7; color: #92400e; }
+.pill-cmp { background: #f3e8ff; color: #6b21a8; }
+
+.controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+.ctl { display: flex; align-items: center; gap: 8px; }
+.ctl label { font-size: 11px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.4px; }
+.ctl-radio { display: flex; gap: 4px; }
+.ctl-radio label { cursor: pointer; padding: 5px 10px; background: #f1f5f9; border-radius: 5px; font-size: 12px; color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 500; border: 1px solid transparent; }
+.ctl-radio label:hover { background: #e2e8f0; }
+.ctl-radio label.active { background: #1e293b; color: white; border-color: #1e293b; }
+.ctl-radio input { display: none; }
+
+.callout { background: #f8fafc; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 12px 14px; margin: 8px 0 14px; font-size: 13px; line-height: 1.55; color: #334155; }
+.callout strong { color: var(--text); }
+.callout .ttl { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+
+@media (max-width: 720px) { .sidebar { width: 240px; } .tr { display: none; } }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-head">
+    <div class="sb-title">Stability & Calibration</div>
+    <div class="sb-sub" id="sb-sub">monitoring hub</div>
+  </div>
+  <a class="sb-hublink" href="./model_performance_hub(1).html">Model Performance Hub <span class="arrow">→</span></a>
+  <a class="sb-hublink" href="./feature_analysis_hub(2).html">Feature Analysis Hub <span class="arrow">→</span></a>
+  <nav class="nav" id="nav"></nav>
+  <div class="sb-foot" id="sb-foot">synthetic demo · illustrative only</div>
+</aside>
+
+<div class="content">
+  <div class="topbar">
+    <div class="crumbs" id="crumbs"></div>
+    <div class="tr" id="topstats"></div>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+/* ============================================================================
+   Seeded PRNG so the synthetic story renders identically across loads.
+   ============================================================================ */
+function mulberry32(seed) {
+  return function () {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const rng = mulberry32(20260427);
+
+const FONT = { family: 'Inter, -apple-system, Segoe UI, Roboto, sans-serif', size: 11, color: '#334155' };
+const CFG = { responsive: true, displayModeBar: false };
+const COLORS = {
+  invariant: '#0ea5e9', tactical: '#f59e0b', compositional: '#a855f7',
+  good: '#10b981', warn: '#f59e0b', bad: '#ef4444',
+  train: '#64748b', cal: '#0ea5e9', oot: '#7c3aed', recent: '#ef4444',
+  accent: '#6366f1',
+};
+
+function el(tag, cls, html) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  return e;
+}
+function pageHeader(t, d) {
+  const h = el('div', 'page-h');
+  h.innerHTML = `<h1 class="page-t">${t}</h1>${d ? `<p class="page-d">${d}</p>` : ''}`;
+  return h;
+}
+function chartCard(title, sub, height) {
+  const wrap = el('div', 'chart-wrap');
+  const head = el('div', 'chart-head');
+  head.innerHTML = `<div class="chart-t">${title}</div>${sub ? `<div class="chart-s">${sub}</div>` : ''}`;
+  const body = el('div', 'chart-body');
+  const plot = el('div');
+  plot.style.height = (height || 360) + 'px';
+  body.appendChild(plot);
+  wrap.appendChild(head); wrap.appendChild(body);
+  return { wrap, plot };
+}
+function baseLayout(extra) {
+  return Object.assign({
+    margin: { t: 28, r: 22, b: 48, l: 60 },
+    font: FONT, paper_bgcolor: 'white', plot_bgcolor: 'white',
+    legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center', font: { size: 11 } },
+  }, extra || {});
+}
+const fmtPct = (v, d) => (v == null || isNaN(v)) ? '—' : (v * 100).toFixed(d == null ? 1 : d) + '%';
+const fmt = (v, d) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(d == null ? 3 : d);
+
+/* ============================================================================
+   Synthetic data generation. Each block is generated once at load.
+   ============================================================================ */
+
+// 90-day timeline ending at "today" (run date 2026-04-21)
+const DAYS = 120;
+function dateLabel(i) {
+  const d = new Date(Date.UTC(2026, 0, 1));
+  d.setUTCDate(d.getUTCDate() + i);
+  return d.toISOString().slice(0, 10);
+}
+const dates = Array.from({ length: DAYS }, (_, i) => dateLabel(i));
+
+// ---------- Feature catalog with stability buckets ----------
+const FEATS = [
+  // top of importance: a mix
+  { name: 'device_entropy_24h',       bucket: 'invariant',     gain: 0.142, stable_target: true,  drift_psi: 0.04 },
+  { name: 'velocity_amt_card_1h',     bucket: 'tactical',      gain: 0.118, stable_target: false, drift_psi: 0.42 },
+  { name: 'embed_merchant_d8',        bucket: 'compositional', gain: 0.094, stable_target: false, drift_psi: 0.31 },
+  { name: 'session_keystroke_var',    bucket: 'invariant',     gain: 0.082, stable_target: true,  drift_psi: 0.06 },
+  { name: 'ratio_velocity_amt_dow',   bucket: 'compositional', gain: 0.071, stable_target: true,  drift_psi: 0.19 },
+  { name: 'bin_geo_mismatch',         bucket: 'tactical',      gain: 0.064, stable_target: false, drift_psi: 0.38 },
+  { name: 'account_age_days',         bucket: 'invariant',     gain: 0.058, stable_target: true,  drift_psi: 0.03 },
+  { name: 'mcc_risk_30d',             bucket: 'tactical',      gain: 0.051, stable_target: false, drift_psi: 0.22 },
+  { name: 'ip_asn_reputation',        bucket: 'invariant',     gain: 0.043, stable_target: true,  drift_psi: 0.08 },
+  { name: 'embed_device_d4',          bucket: 'compositional', gain: 0.039, stable_target: true,  drift_psi: 0.14 },
+  { name: 'time_since_last_change',   bucket: 'invariant',     gain: 0.034, stable_target: true,  drift_psi: 0.05 },
+  { name: 'velocity_count_card_24h',  bucket: 'tactical',      gain: 0.029, stable_target: false, drift_psi: 0.27 },
+  { name: 'amt_z_account_30d',        bucket: 'compositional', gain: 0.024, stable_target: true,  drift_psi: 0.11 },
+  { name: 'declined_attempts_7d',     bucket: 'tactical',      gain: 0.021, stable_target: false, drift_psi: 0.33 },
+  { name: 'address_match_score',      bucket: 'invariant',     gain: 0.017, stable_target: true,  drift_psi: 0.04 },
+  { name: 'embed_ip_d4',              bucket: 'compositional', gain: 0.014, stable_target: false, drift_psi: 0.18 },
+  { name: 'billing_shipping_dist_km', bucket: 'invariant',     gain: 0.012, stable_target: true,  drift_psi: 0.07 },
+  { name: 'cnp_indicator',            bucket: 'tactical',      gain: 0.010, stable_target: false, drift_psi: 0.16 },
+  { name: 'is_recurring_merchant',    bucket: 'invariant',     gain: 0.008, stable_target: true,  drift_psi: 0.02 },
+  { name: 'tail_24',                  bucket: 'compositional', gain: 0.006, stable_target: true,  drift_psi: 0.10 },
+];
+// pad with a long tail of small features so the cumulative looks realistic
+for (let i = 0; i < 130; i++) {
+  const r = rng();
+  FEATS.push({
+    name: `feat_${(i + 21).toString().padStart(3, '0')}`,
+    bucket: r < 0.4 ? 'invariant' : r < 0.7 ? 'tactical' : 'compositional',
+    gain: 0.005 * Math.exp(-i / 35),
+    stable_target: rng() > 0.35,
+    drift_psi: Math.abs(gauss(rng)) * 0.12,
+  });
+}
+// renormalize gain
+{ const s = FEATS.reduce((a, f) => a + f.gain, 0); FEATS.forEach(f => f.gain /= s); }
+FEATS.sort((a, b) => b.gain - a.gain);
+
+// cumulative importance share
+const cum = []; { let s = 0; FEATS.forEach((f, i) => { s += f.gain; cum.push({ k: i + 1, share: s }); }); }
+const top10share = cum[9].share;
+const top20share = cum[19].share;
+const stableShare = FEATS.filter(f => f.stable_target).reduce((a, f) => a + f.gain, 0);
+const tacticalShare = FEATS.filter(f => f.bucket === 'tactical').reduce((a, f) => a + f.gain, 0);
+
+// ---------- Daily series: fraud rate, mean score, AUC, calibration error ----------
+// Story: a tactical-fraud spike begins around day 70. AUC stays ~stable, but
+// score-fraud calibration drifts and the highest decile fraud rate jumps.
+const daily = dates.map((d, i) => {
+  const base_fraud = 0.0035 + 0.0008 * Math.sin(i / 9) + 0.0004 * gauss(rng);
+  const regime_shift = i >= 70 ? Math.min((i - 70) / 25, 1) * 0.0042 : 0;
+  const fraud_rate = Math.max(0.0008, base_fraud + regime_shift);
+  // score follows partially — model picks up some but not all of the new pattern
+  const mean_score = 0.0040 + 0.00045 * Math.sin(i / 9) + (i >= 70 ? Math.min((i - 70) / 25, 1) * 0.0018 : 0) + 0.00025 * gauss(rng);
+  // AUC: stays roughly flat (0.92 ± 0.01) because *ranking* doesn't break much
+  const auc = 0.918 + 0.012 * Math.sin(i / 14) + 0.005 * gauss(rng) - (i >= 70 ? Math.min((i - 70) / 30, 1) * 0.008 : 0);
+  // ECE (calibration): grows after the regime shift
+  const ece_train = 0.012 + 0.004 * Math.abs(gauss(rng)) * 0.3;
+  const ece = 0.014 + 0.005 * Math.abs(gauss(rng)) * 0.3 + (i >= 70 ? Math.min((i - 70) / 25, 1) * 0.038 : 0);
+  // top-decile fraud rate
+  const top_decile = 0.052 + 0.005 * gauss(rng) + (i >= 70 ? Math.min((i - 70) / 22, 1) * 0.022 : 0);
+  return { date: d, fraud_rate, mean_score, auc, ece, top_decile };
+});
+
+// ---------- Adversarial validation: train vs OOT classifier ----------
+// "AUC ~0.78" — meaningful drift; show top discriminating features.
+const ADV_AUC = 0.781;
+const advFeats = [
+  { name: 'velocity_amt_card_1h',   imp: 0.182, note: 'tactical, attack-driven shift' },
+  { name: 'bin_geo_mismatch',       imp: 0.144, note: 'tactical, new BIN cluster in OOT' },
+  { name: 'embed_merchant_d8',      imp: 0.121, note: 'compositional, embedding drifted' },
+  { name: 'declined_attempts_7d',   imp: 0.098, note: 'tactical, ATO surge' },
+  { name: 'mcc_risk_30d',           imp: 0.082, note: 'tactical, MCC mix shift' },
+  { name: 'embed_ip_d4',            imp: 0.067, note: 'compositional, IP space shift' },
+  { name: 'cnp_indicator',          imp: 0.041, note: 'channel mix' },
+  { name: 'velocity_count_card_24h',imp: 0.034, note: 'tactical' },
+  { name: 'ratio_velocity_amt_dow', imp: 0.028, note: 'compositional' },
+  { name: 'session_keystroke_var',  imp: 0.012, note: 'invariant — should be low' },
+];
+
+// ---------- Decile fraud rate over time (calibration drift) ----------
+// 10 deciles × DAYS days. Top deciles drift; mid deciles stable.
+const deciles = [];
+for (let d = 0; d < 10; d++) {
+  const series = daily.map((row, i) => {
+    const base = [0.0006,0.0009,0.0012,0.0017,0.0024,0.0036,0.0058,0.0098,0.0210,0.052][d];
+    const shift_top = d >= 7 ? (i >= 70 ? Math.min((i - 70) / 22, 1) * (d === 9 ? 0.020 : d === 8 ? 0.008 : 0.003) : 0) : 0;
+    const noise = 0.05 * base * gauss(rng);
+    return Math.max(0.0001, base + shift_top + noise);
+  });
+  deciles.push({ d: d + 1, series });
+}
+
+// ---------- Score distributions: train (in-sample), calibration, recent week ----------
+// Show training scores artificially separated; recent week shifted right.
+function makeScoreHist(meanFraud, sepFactor, shiftRight, noiseAmt, n) {
+  // Returns histogram over 30 bins on [0, 1] of synthetic mixed scores
+  const bins = 30;
+  const counts = Array(bins).fill(0);
+  const N = n || 8000;
+  for (let i = 0; i < N; i++) {
+    const isFraud = rng() < meanFraud;
+    let s;
+    if (isFraud) s = 0.5 + sepFactor * 0.45 + 0.16 * gauss(rng);
+    else s = 0.10 - sepFactor * 0.06 + 0.13 * gauss(rng);
+    s = Math.max(0, Math.min(0.999, s + shiftRight + noiseAmt * gauss(rng)));
+    counts[Math.floor(s * bins)]++;
+  }
+  return { edges: Array.from({ length: bins + 1 }, (_, i) => i / bins), counts };
+}
+const histTrain  = makeScoreHist(0.0045, 1.0,  0.00, 0.00); // sharp/separated
+const histCal    = makeScoreHist(0.0040, 0.55, 0.02, 0.02); // realistic
+const histRecent = makeScoreHist(0.0048, 0.50, 0.07, 0.03); // shifted right
+
+// ---------- Bin edges from three strategies ----------
+function quantileEdges(hist, k) {
+  const total = hist.counts.reduce((a, b) => a + b, 0);
+  const target = total / k;
+  const edges = [0];
+  let acc = 0, j = 1;
+  for (let i = 0; i < hist.counts.length && j < k; i++) {
+    acc += hist.counts[i];
+    while (acc >= target * j && j < k) { edges.push(hist.edges[i + 1]); j++; }
+  }
+  edges.push(1);
+  return edges;
+}
+const edgesTrain  = quantileEdges(histTrain, 10);
+const edgesCal    = quantileEdges(histCal, 10);
+const edgesRecent = quantileEdges(histRecent, 10);
+
+// ---------- Bin volume drift after deploying with each strategy ----------
+// Population observed in the next 4 weeks is closest to "Cal" world.
+function applyEdges(hist, edges) {
+  const k = edges.length - 1;
+  const counts = Array(k).fill(0);
+  for (let i = 0; i < hist.counts.length; i++) {
+    const center = (hist.edges[i] + hist.edges[i + 1]) / 2;
+    let b = 0;
+    while (b < k && center > edges[b + 1]) b++;
+    counts[b] += hist.counts[i];
+  }
+  const total = counts.reduce((a, b) => a + b, 0) || 1;
+  return counts.map(c => c / total);
+}
+// "Truth" distribution = histRecent slightly perturbed forward
+const histDeployed = makeScoreHist(0.0046, 0.52, 0.06, 0.03, 12000);
+const volTrainEdges  = applyEdges(histDeployed, edgesTrain);
+const volCalEdges    = applyEdges(histDeployed, edgesCal);
+const volRecentEdges = applyEdges(histDeployed, edgesRecent);
+
+// ---------- Calibration set vs raw scores: isotonic-then-bin stability ----------
+const rawBins = []; const isoBins = [];
+for (let w = 0; w < 12; w++) {
+  // simulate weekly bin populations
+  const drift = w >= 6 ? (w - 6) * 0.06 : 0;
+  rawBins.push(Array.from({ length: 10 }, (_, k) => 0.10 + 0.02 * gauss(rng) + (k >= 7 ? -drift * 0.7 : drift * 0.18)));
+  isoBins.push(Array.from({ length: 10 }, (_, k) => 0.10 + 0.008 * gauss(rng) + (k >= 7 ? -drift * 0.15 : drift * 0.04)));
+}
+
+// ---------- Cohort slice stability ----------
+const cohorts = [
+  { name: 'CNP · new account',     n: 184220, oot_fraud: 0.0084, train_fraud: 0.0061, oot_auc: 0.873, train_auc: 0.918, fcr_at_2pct: 0.41 },
+  { name: 'CNP · seasoned',        n: 612843, oot_fraud: 0.0019, train_fraud: 0.0017, oot_auc: 0.951, train_auc: 0.957, fcr_at_2pct: 0.78 },
+  { name: 'Card present',          n: 296115, oot_fraud: 0.0008, train_fraud: 0.0009, oot_auc: 0.937, train_auc: 0.941, fcr_at_2pct: 0.69 },
+  { name: 'Mobile wallet',         n: 421005, oot_fraud: 0.0014, train_fraud: 0.0012, oot_auc: 0.929, train_auc: 0.934, fcr_at_2pct: 0.71 },
+  { name: 'High-amount (>$2k)',    n:  41880, oot_fraud: 0.0061, train_fraud: 0.0044, oot_auc: 0.886, train_auc: 0.929, fcr_at_2pct: 0.55 },
+  { name: 'New merchant (<30d)',   n:  73122, oot_fraud: 0.0119, train_fraud: 0.0049, oot_auc: 0.798, train_auc: 0.925, fcr_at_2pct: 0.34 },
+  { name: 'Recurring billing',     n: 188974, oot_fraud: 0.0006, train_fraud: 0.0006, oot_auc: 0.943, train_auc: 0.945, fcr_at_2pct: 0.81 },
+];
+
+// ---------- Chargeback maturation curve ----------
+const matureDays = Array.from({ length: 91 }, (_, i) => i);
+// Weibull-ish CDF reaching 95% at 40 days
+const matureCDF = matureDays.map(d => 1 - Math.exp(-Math.pow(d / 22, 1.45)));
+const idx95 = matureCDF.findIndex(v => v >= 0.95);
+
+// Apparent vs true fraud rate by lookback days
+const lookback = matureDays.map(d => {
+  const visible = matureCDF[d];
+  const true_fr = 0.0042;
+  return { d, true_fr, apparent: true_fr * visible };
+});
+
+// ---------- Conditional vs marginal PSI ----------
+// 12 features. Marginal PSI looks scary on tactical features even when the
+// per-segment story is benign; segment-conditional PSI separates real shifts.
+const psiFeats = [
+  { f: 'velocity_amt_card_1h',   marg: 0.42, cond: 0.39, bucket: 'tactical',      verdict: 'real shift' },
+  { f: 'bin_geo_mismatch',       marg: 0.38, cond: 0.07, bucket: 'tactical',      verdict: 'mix change' },
+  { f: 'embed_merchant_d8',      marg: 0.31, cond: 0.28, bucket: 'compositional', verdict: 'real shift' },
+  { f: 'declined_attempts_7d',   marg: 0.33, cond: 0.31, bucket: 'tactical',      verdict: 'real shift' },
+  { f: 'mcc_risk_30d',           marg: 0.22, cond: 0.05, bucket: 'tactical',      verdict: 'mix change' },
+  { f: 'velocity_count_card_24h',marg: 0.27, cond: 0.18, bucket: 'tactical',      verdict: 'partial' },
+  { f: 'ratio_velocity_amt_dow', marg: 0.19, cond: 0.04, bucket: 'compositional', verdict: 'mix change' },
+  { f: 'embed_ip_d4',            marg: 0.18, cond: 0.16, bucket: 'compositional', verdict: 'real shift' },
+  { f: 'cnp_indicator',          marg: 0.16, cond: 0.02, bucket: 'tactical',      verdict: 'mix change' },
+  { f: 'embed_device_d4',        marg: 0.14, cond: 0.11, bucket: 'compositional', verdict: 'partial' },
+  { f: 'amt_z_account_30d',      marg: 0.11, cond: 0.09, bucket: 'compositional', verdict: 'minor' },
+  { f: 'session_keystroke_var',  marg: 0.06, cond: 0.05, bucket: 'invariant',     verdict: 'stable' },
+  { f: 'ip_asn_reputation',      marg: 0.08, cond: 0.07, bucket: 'invariant',     verdict: 'stable' },
+  { f: 'device_entropy_24h',     marg: 0.04, cond: 0.04, bucket: 'invariant',     verdict: 'stable' },
+  { f: 'account_age_days',       marg: 0.03, cond: 0.03, bucket: 'invariant',     verdict: 'stable' },
+];
+
+// ---------- Concept vs input drift monitoring (post-deploy) ----------
+const monDays = 60;
+const monitor = Array.from({ length: monDays }, (_, i) => {
+  // input drift (bin volume KL) - moderate
+  const inputDrift = 0.05 + 0.02 * Math.sin(i / 6) + (i >= 30 ? Math.min((i - 30) / 15, 1) * 0.10 : 0) + 0.015 * Math.abs(gauss(rng));
+  // concept drift (bin fraud rate divergence) - jumps later, big
+  const conceptDrift = 0.02 + 0.01 * Math.abs(gauss(rng)) + (i >= 38 ? Math.min((i - 38) / 12, 1) * 0.18 : 0);
+  return { i, inputDrift, conceptDrift };
+});
+
+/* ============================================================================
+   NAV + ROUTES
+   ============================================================================ */
+const NAV = [
+  { id: 'overview',  title: 'Overview', kind: 'direct' },
+  { id: 'features',  title: 'Feature stability', children: [
+    { id: 'concentration', title: 'Importance concentration' },
+    { id: 'buckets',       title: 'Stability buckets' },
+    { id: 'psi',           title: 'Conditional PSI' },
+  ]},
+  { id: 'adversarial', title: 'Adversarial validation', kind: 'direct', badge: 'AUC 0.78', badgeKind: 'warn' },
+  { id: 'calibration', title: 'Calibration drift', children: [
+    { id: 'deciles',  title: 'Decile fraud rates' },
+    { id: 'auc-vs-cal', title: 'AUC stable vs ECE drift' },
+    { id: 'dual',     title: 'Dual signal check' },
+  ]},
+  { id: 'cohorts', title: 'Cohort slice stability', kind: 'direct' },
+  { id: 'maturity', title: 'Label maturity', children: [
+    { id: 'curve',    title: 'Chargeback curve (95% at 40d)' },
+    { id: 'censoring', title: 'Censoring effect' },
+  ]},
+  { id: 'thresholds', title: 'Threshold construction', children: [
+    { id: 'distributions', title: 'Score distributions: 3 worlds' },
+    { id: 'edges',         title: 'Bin edges comparison' },
+    { id: 'population',    title: 'Bin volume drift after deploy' },
+    { id: 'isotonic',      title: 'Isotonic-then-bin stability' },
+  ]},
+  { id: 'monitoring', title: 'Post-deploy monitoring', kind: 'direct', badge: 'live', badgeKind: 'accent' },
+];
+
+const ROUTES = {};
+
+/* -------------------- OVERVIEW -------------------- */
+ROUTES['overview'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Stability & Calibration Monitoring',
+    `Companion to the model-performance and feature-analysis hubs. Each section shows one monitoring concept from the SOTA stability conversation, with synthetic data sized to a fraud-style problem (millions of transactions, 0.1–1% positives, hundreds of features). The narrative thread: between days 70–95 a new tactical attack pattern emerges. AUC barely moves. Calibration breaks. The pages below show how to detect that.`
+  ));
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi kpi-accent"><div class="kpi-l">Top-10 importance share</div><div class="kpi-v">${fmtPct(top10share, 1)}</div><div class="kpi-s">healthy zone &lt;55%</div></div>
+    <div class="kpi kpi-good"><div class="kpi-l">Stable-target share</div><div class="kpi-v">${fmtPct(stableShare, 1)}</div><div class="kpi-s">target ≥60–70%</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">Tactical-bucket share</div><div class="kpi-v">${fmtPct(tacticalShare, 1)}</div><div class="kpi-s">expected to drift</div></div>
+    <div class="kpi kpi-bad"><div class="kpi-l">Adversarial AUC (train vs OOT)</div><div class="kpi-v">${ADV_AUC.toFixed(2)}</div><div class="kpi-s">&gt;0.6 = meaningful drift</div></div>
+  `;
+  m.appendChild(kpis);
+
+  const k2 = el('div', 'kpis');
+  k2.innerHTML = `
+    <div class="kpi"><div class="kpi-l">Mean OOT AUC</div><div class="kpi-v">${fmt(daily.slice(-30).reduce((a,b)=>a+b.auc,0)/30, 3)}</div><div class="kpi-s">last 30 days</div></div>
+    <div class="kpi kpi-bad"><div class="kpi-l">OOT ECE</div><div class="kpi-v">${fmt(daily.slice(-30).reduce((a,b)=>a+b.ece,0)/30, 3)}</div><div class="kpi-s">vs train 0.014 — 4× worse</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">Top-decile fraud rate</div><div class="kpi-v">${fmtPct(daily.slice(-7).reduce((a,b)=>a+b.top_decile,0)/7, 2)}</div><div class="kpi-s">vs ${fmtPct(daily.slice(0,30).reduce((a,b)=>a+b.top_decile,0)/30, 2)} early period</div></div>
+    <div class="kpi kpi-accent"><div class="kpi-l">Chargeback 95% maturity</div><div class="kpi-v">${idx95}d</div><div class="kpi-s">OOT eval window: today − ${idx95}d</div></div>
+  `;
+  m.appendChild(k2);
+
+  const overview = el('div', 'callout');
+  overview.innerHTML = `
+    <div class="ttl">Why this page exists</div>
+    A standard model-performance dashboard would say "AUC is fine, ship it." The metrics on this page disagree, and the disagreement is the point.
+    <strong>Discrimination has held; calibration and feature-target relationships have not.</strong> Each subsection isolates one of the diagnostic techniques —
+    adversarial validation, decile drift, dual-signal check, conditional PSI, label-maturity adjustment, cohort-slice stability, threshold-construction strategy, and post-deploy concept-vs-input drift —
+    that we discussed as the SOTA toolkit. Numbers are synthetic but parameterized to match a 0.1–1% fraud-rate problem on hundreds of features.
+  `;
+  m.appendChild(overview);
+
+  // Headline daily AUC vs ECE
+  const c1 = chartCard('Daily AUC vs ECE — discrimination stable, calibration breaks',
+    'Same model, same scoring window. AUC line is essentially flat through the regime shift. ECE quadruples. A single-metric dashboard would miss this.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { x: dates, y: daily.map(d => d.auc), name: 'AUC', type: 'scatter', mode: 'lines', line: { color: COLORS.accent, width: 2 } },
+    { x: dates, y: daily.map(d => d.ece), name: 'ECE', type: 'scatter', mode: 'lines', yaxis: 'y2', line: { color: COLORS.bad, width: 2 } },
+  ], baseLayout({
+    yaxis: { title: 'AUC', range: [0.85, 0.96], tickformat: '.3f' },
+    yaxis2: { title: 'ECE', overlaying: 'y', side: 'right', range: [0, 0.07], tickformat: '.3f' },
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: dates[70], x1: dates[70], y0: 0, y1: 1, line: { color: '#ef4444', width: 1.4, dash: 'dash' } }],
+    annotations: [{ xref: 'x', yref: 'paper', x: dates[70], y: 1.02, text: 'regime shift starts', showarrow: false, font: { color: '#ef4444', size: 10 }, xanchor: 'left' }],
+  }), CFG);
+};
+
+/* -------------------- FEATURE STABILITY -------------------- */
+ROUTES['features/concentration'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Feature importance concentration',
+    `The relevant question isn't "how many features" — it's "how concentrated is the dependency." A model with 300 features but a top-10 carrying 60%+ of importance is structurally a 10-feature model with decoration. Healthy fraud GBMs typically want top-10 share <55% and stable-target features carrying ≥60–70% of cumulative gain.`
+  ));
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi ${top10share > 0.55 ? 'kpi-warn' : 'kpi-good'}"><div class="kpi-l">Top-10 cumulative gain</div><div class="kpi-v">${fmtPct(top10share, 1)}</div><div class="kpi-s">${top10share > 0.55 ? 'over concentration threshold' : 'within healthy range'}</div></div>
+    <div class="kpi"><div class="kpi-l">Top-20 cumulative gain</div><div class="kpi-v">${fmtPct(top20share, 1)}</div><div class="kpi-s">long-tail check</div></div>
+    <div class="kpi kpi-good"><div class="kpi-l">Stable-target share</div><div class="kpi-v">${fmtPct(stableShare, 1)}</div><div class="kpi-s">cumulative gain on stable-target features</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">Single-feature max</div><div class="kpi-v">${fmtPct(FEATS[0].gain, 1)}</div><div class="kpi-s">${FEATS[0].name} · &lt;15% target</div></div>
+  `;
+  m.appendChild(kpis);
+
+  // Lorenz / cumulative importance curve
+  const c1 = chartCard('Cumulative importance share', 'Steeper early curve = more concentration risk. Reference line is uniform-importance baseline.');
+  m.appendChild(c1.wrap);
+  const xs = cum.map(c => c.k);
+  Plotly.newPlot(c1.plot, [
+    { x: xs, y: cum.map(c => c.share), type: 'scatter', mode: 'lines', name: 'Cumulative share', line: { color: COLORS.accent, width: 2.5 }, fill: 'tozeroy', fillcolor: 'rgba(99,102,241,0.08)' },
+    { x: xs, y: xs.map(i => i / FEATS.length), type: 'scatter', mode: 'lines', name: 'Uniform baseline', line: { color: '#cbd5e1', width: 1, dash: 'dash' } },
+  ], baseLayout({
+    xaxis: { title: 'Feature rank (by gain)' },
+    yaxis: { title: 'Cumulative importance', tickformat: '.0%' },
+    shapes: [
+      { type: 'line', x0: 10, x1: 10, y0: 0, y1: top10share, line: { color: COLORS.warn, width: 1, dash: 'dot' } },
+      { type: 'line', x0: 0, x1: 10, y0: top10share, y1: top10share, line: { color: COLORS.warn, width: 1, dash: 'dot' } },
+    ],
+    annotations: [{ x: 10, y: top10share, text: `top 10 = ${fmtPct(top10share,1)}`, ax: 60, ay: -10, font: { size: 10, color: COLORS.warn } }],
+  }), CFG);
+
+  // Top features bar with bucket coloring
+  const top = FEATS.slice(0, 20);
+  const c2 = chartCard('Top-20 features by gain · colored by stability bucket', 'Invariant features are what carries you between regimes. Tactical concentration is the failure mode.');
+  m.appendChild(c2.wrap);
+  Plotly.newPlot(c2.plot, [{
+    x: top.map(f => f.gain), y: top.map(f => f.name), type: 'bar', orientation: 'h',
+    marker: { color: top.map(f => COLORS[f.bucket]) },
+    text: top.map(f => f.bucket), textposition: 'outside', textfont: { size: 10 },
+  }], baseLayout({
+    xaxis: { title: 'Gain share', tickformat: '.1%' },
+    yaxis: { autorange: 'reversed' },
+    margin: { t: 20, r: 90, b: 46, l: 200 }, height: 480,
+    showlegend: false,
+  }), CFG);
+
+  m.appendChild(makeCallout('Heuristic, not a hard rule', `
+    "≥60% of cumulative gain on stable-target features" is a target, not a SOX control. The number that matters more is whether the failure mode of any one feature would crater the model. If <code>${FEATS[0].name}</code> alone carries ${fmtPct(FEATS[0].gain,1)},
+    a single upstream pipeline change or a successful adversarial pivot against that feature is now a P0. The fix isn't to remove it — it's to engineer redundancy from a different stability bucket that captures the same signal.
+  `));
+};
+
+ROUTES['features/buckets'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Stability buckets · invariant / tactical / compositional',
+    `Decompose features by their <em>relationship</em> to fraud, not their distributional stability. <span class="pill pill-inv">Invariant</span> features capture things attackers can't change without abandoning the attack. <span class="pill pill-tac">Tactical</span> features capture the current attack surface and are <em>expected</em> to drift. <span class="pill pill-cmp">Compositional</span> features re-derive themselves from raw data — formulas are stable, meanings shift. PSI alarms read very differently across the three buckets.`
+  ));
+
+  // pies + share table
+  const buckets = ['invariant', 'tactical', 'compositional'];
+  const bucketShare = buckets.map(b => FEATS.filter(f => f.bucket === b).reduce((a, f) => a + f.gain, 0));
+  const bucketCount = buckets.map(b => FEATS.filter(f => f.bucket === b).length);
+
+  const r1 = el('div', 'row2');
+  const cA = chartCard('Bucket share of cumulative gain', 'Most of the model\'s predictive power should sit in stable-relationship features.');
+  r1.appendChild(cA.wrap);
+  Plotly.newPlot(cA.plot, [{
+    labels: buckets, values: bucketShare, type: 'pie', hole: 0.5,
+    marker: { colors: buckets.map(b => COLORS[b]) }, textinfo: 'label+percent', textposition: 'outside',
+  }], baseLayout({ showlegend: false, margin: { t: 30, r: 30, b: 30, l: 30 } }), CFG);
+
+  const cB = chartCard('Mean PSI by bucket (train → OOT)', 'Tactical features drifting hard is expected and not a model-quality signal. Invariant features drifting is usually a data-pipeline issue.');
+  r1.appendChild(cB.wrap);
+  Plotly.newPlot(cB.plot, [{
+    x: buckets,
+    y: buckets.map(b => {
+      const fs = FEATS.filter(f => f.bucket === b);
+      return fs.reduce((a, f) => a + f.drift_psi, 0) / fs.length;
+    }),
+    type: 'bar',
+    marker: { color: buckets.map(b => COLORS[b]) },
+    text: buckets.map(b => {
+      const fs = FEATS.filter(f => f.bucket === b);
+      return (fs.reduce((a, f) => a + f.drift_psi, 0) / fs.length).toFixed(2);
+    }),
+    textposition: 'outside',
+  }], baseLayout({
+    yaxis: { title: 'Mean PSI', range: [0, 0.35] }, showlegend: false,
+    shapes: [
+      { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.10, y1: 0.10, line: { color: '#cbd5e1', width: 1, dash: 'dash' } },
+      { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.25, y1: 0.25, line: { color: '#fb923c', width: 1, dash: 'dash' } },
+    ],
+    annotations: [
+      { xref: 'paper', x: 0.99, y: 0.10, text: 'PSI=0.10', showarrow: false, font: { size: 9, color: '#94a3b8' }, xanchor: 'right' },
+      { xref: 'paper', x: 0.99, y: 0.25, text: 'PSI=0.25', showarrow: false, font: { size: 9, color: '#fb923c' }, xanchor: 'right' },
+    ],
+  }), CFG);
+  m.appendChild(r1);
+
+  // Table
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Bucket reference table</div><div class="chart-s">How to read PSI alarms in each bucket.</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  tbl.innerHTML = `
+    <thead><tr><th>Bucket</th><th>What it captures</th><th>Expected behavior</th><th>PSI &gt;0.25 means…</th><th>Count</th><th>Gain share</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill pill-inv">invariant</span></td><td>Device, behavioral biometrics, network-level, structural account features</td><td>Stable distribution, stable target relationship</td><td>Likely upstream data issue, not fraud evolution</td><td>${bucketCount[0]}</td><td>${fmtPct(bucketShare[0], 1)}</td></tr>
+      <tr><td><span class="pill pill-tac">tactical</span></td><td>BIN/MCC patterns, geo-IP combos, current attack surface velocities</td><td>Drifts as attackers move, target relationship can flip</td><td>Expected; drives retraining cadence</td><td>${bucketCount[1]}</td><td>${fmtPct(bucketShare[1], 1)}</td></tr>
+      <tr><td><span class="pill pill-cmp">compositional</span></td><td>Aggregations, ratios, embeddings derived from raw data</td><td>Formula stable, meaning drifts as inputs shift</td><td>Re-derivation needed; embeddings may be stale</td><td>${bucketCount[2]}</td><td>${fmtPct(bucketShare[2], 1)}</td></tr>
+    </tbody>`;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+};
+
+ROUTES['features/psi'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Conditional PSI — separating mix changes from real shifts',
+    `Marginal PSI fires constantly in fraud because the customer/channel/segment mix moves. The diagnostic version is segment-conditional PSI: hold acquisition channel × tenure × product fixed and ask whether the feature distribution still drifted. Features that look bad marginally but benign conditionally are mix changes, not target-relationship breaks.`
+  ));
+
+  const c1 = chartCard('Marginal vs conditional PSI · top features', 'Diagonal would mean all drift is "real". Off-diagonal points to the bottom-right are mix changes you can ignore for retraining triggers.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    {
+      x: psiFeats.map(f => f.marg), y: psiFeats.map(f => f.cond),
+      mode: 'markers+text', type: 'scatter',
+      text: psiFeats.map(f => f.f), textposition: 'top right', textfont: { size: 9, color: '#475569' },
+      marker: {
+        size: 11, color: psiFeats.map(f => COLORS[f.bucket]),
+        line: { color: 'white', width: 1 },
+      },
+      hovertemplate: '%{text}<br>marginal PSI: %{x:.2f}<br>conditional PSI: %{y:.2f}<extra></extra>',
+    },
+    { x: [0, 0.5], y: [0, 0.5], mode: 'lines', type: 'scatter', line: { color: '#cbd5e1', width: 1, dash: 'dash' }, showlegend: false, hoverinfo: 'skip' },
+  ], baseLayout({
+    xaxis: { title: 'Marginal PSI', range: [0, 0.5] },
+    yaxis: { title: 'Conditional PSI (segment-controlled)', range: [0, 0.5] },
+    showlegend: false,
+    shapes: [
+      { type: 'rect', xref: 'x', yref: 'y', x0: 0.25, x1: 0.5, y0: 0, y1: 0.10, fillcolor: 'rgba(245,158,11,0.08)', line: { width: 0 } },
+      { type: 'rect', xref: 'x', yref: 'y', x0: 0.25, x1: 0.5, y0: 0.25, y1: 0.5, fillcolor: 'rgba(239,68,68,0.08)', line: { width: 0 } },
+    ],
+    annotations: [
+      { x: 0.42, y: 0.04, text: 'mix change zone', showarrow: false, font: { size: 10, color: '#92400e' } },
+      { x: 0.42, y: 0.46, text: 'real shift zone', showarrow: false, font: { size: 10, color: '#991b1b' } },
+    ],
+  }), CFG);
+
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Per-feature interpretation</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  tbl.innerHTML = `
+    <thead><tr><th>Feature</th><th>Bucket</th><th>Marginal PSI</th><th>Conditional PSI</th><th>Δ</th><th>Verdict</th></tr></thead>
+    <tbody>${psiFeats.map(f => {
+      const dlt = f.marg - f.cond;
+      const cls = f.verdict === 'real shift' ? 'pill-bad' : f.verdict === 'mix change' ? 'pill-warn' : f.verdict === 'partial' ? 'pill-accent' : 'pill-good';
+      return `<tr><td>${f.f}</td><td><span class="pill pill-${f.bucket==='invariant'?'inv':f.bucket==='tactical'?'tac':'cmp'}">${f.bucket}</span></td><td>${f.marg.toFixed(2)}</td><td>${f.cond.toFixed(2)}</td><td>${dlt.toFixed(2)}</td><td><span class="pill ${cls}">${f.verdict}</span></td></tr>`;
+    }).join('')}</tbody>`;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+};
+
+/* -------------------- ADVERSARIAL VALIDATION -------------------- */
+ROUTES['adversarial'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Adversarial validation — train vs OOT classifier',
+    `Take train and OOT rows, label them by which one they came from, train a binary classifier on the model features. If that classifier separates them with AUC much above 0.6, your feature space has shifted meaningfully and any OOT performance number is suspect — you might be measuring a different problem. The features that classifier finds most discriminative are the ones leaking time information and are candidates for transformation or removal.`
+  ));
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi kpi-bad"><div class="kpi-l">Adversarial AUC</div><div class="kpi-v">${ADV_AUC.toFixed(3)}</div><div class="kpi-s">0.5 = identical · &gt;0.6 = meaningful</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">Top discriminator share</div><div class="kpi-v">${fmtPct(advFeats[0].imp,1)}</div><div class="kpi-s">${advFeats[0].name}</div></div>
+    <div class="kpi"><div class="kpi-l">Tactical features in top-10</div><div class="kpi-v">${advFeats.slice(0,10).filter(f => f.note.includes('tactical')).length}</div><div class="kpi-s">expected</div></div>
+    <div class="kpi kpi-good"><div class="kpi-l">Invariant features in top-10</div><div class="kpi-v">${advFeats.slice(0,10).filter(f => f.note.includes('invariant')).length}</div><div class="kpi-s">flag if &gt; 1–2</div></div>
+  `;
+  m.appendChild(kpis);
+
+  const c1 = chartCard('Top adversarial discriminators', 'High importance + invariant bucket = data-pipeline leak. High importance + tactical bucket = real attack-surface drift; OOT AUC numbers should be discounted accordingly.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [{
+    x: advFeats.map(f => f.imp), y: advFeats.map(f => f.name),
+    type: 'bar', orientation: 'h',
+    marker: {
+      color: advFeats.map(f =>
+        f.note.includes('invariant') ? COLORS.invariant :
+        f.note.includes('compositional') ? COLORS.compositional :
+        COLORS.tactical),
+    },
+    text: advFeats.map(f => f.note), textposition: 'outside', textfont: { size: 10 },
+  }], baseLayout({
+    xaxis: { title: 'Adversarial classifier importance', tickformat: '.0%' },
+    yaxis: { autorange: 'reversed' },
+    margin: { t: 20, r: 220, b: 46, l: 200 }, height: 420, showlegend: false,
+  }), CFG);
+
+  m.appendChild(makeCallout('Reading the result', `
+    AUC=${ADV_AUC.toFixed(2)} means a binary classifier can identify train vs OOT samples reliably from features alone. Your feature space has shifted. The OOT AUC measured on the fraud target is conditional on this distribution — it can look fine while the model is operating in a different regime than it was trained on.
+    Action: <strong>discount the headline OOT AUC, retrain with more recent data, and remove or transform features that score high here for the wrong reason.</strong> The bottom of the list — invariant features with low adversarial importance — are exactly where you want stability.
+  `, 'bad'));
+};
+
+/* -------------------- CALIBRATION DRIFT -------------------- */
+ROUTES['calibration/deciles'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Decile fraud rates over time',
+    `AUC measures rank order; threshold-based decisioning depends on score-to-fraud-rate <em>mapping</em>. This page tracks the realized fraud rate inside each score decile day-by-day. A robust calibration shows ten roughly-flat lines. Drift in the top deciles means your highest-risk bucket isn't as risky as it used to be — the model is missing the new pattern even when ranking holds.`
+  ));
+
+  const c1 = chartCard('Per-decile fraud rate over time', 'Top deciles drifting upward (because realized fraud is higher than the model implied) is the signature of concept drift the AUC line above hides.');
+  m.appendChild(c1.wrap);
+  const palette = ['#cbd5e1','#94a3b8','#64748b','#475569','#fbbf24','#f59e0b','#fb923c','#f97316','#ef4444','#dc2626'];
+  const traces = deciles.map((d, i) => ({
+    x: dates, y: d.series, type: 'scatter', mode: 'lines',
+    name: `D${d.d}`, line: { color: palette[i], width: i >= 7 ? 2 : 1.2 },
+  }));
+  Plotly.newPlot(c1.plot, traces, baseLayout({
+    yaxis: { title: 'Fraud rate within decile', tickformat: '.1%', type: 'log' },
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: dates[70], x1: dates[70], y0: 0, y1: 1, line: { color: '#ef4444', width: 1.4, dash: 'dash' } }],
+    annotations: [{ xref: 'x', yref: 'paper', x: dates[70], y: 1.02, text: 'regime shift', showarrow: false, font: { color: '#ef4444', size: 10 }, xanchor: 'left' }],
+    height: 460,
+  }), CFG);
+
+  const c2 = chartCard('Top decile fraud rate (zoomed)', 'D10 alone, linear scale. The lift in fraud rate post-day-70 is what threshold-based policy will feel even if AUC numbers say everything is fine.');
+  m.appendChild(c2.wrap);
+  Plotly.newPlot(c2.plot, [
+    { x: dates, y: deciles[9].series, type: 'scatter', mode: 'lines', line: { color: COLORS.bad, width: 2.5 }, name: 'D10 fraud rate' },
+    { x: dates, y: dates.map((_, i) => i < 70 ? null : deciles[9].series[i]), type: 'scatter', mode: 'lines', line: { color: COLORS.bad, width: 2.5 }, fill: 'tozeroy', fillcolor: 'rgba(239,68,68,0.10)', showlegend: false, hoverinfo: 'skip' },
+  ], baseLayout({ yaxis: { title: 'D10 fraud rate', tickformat: '.1%' }, height: 280 }), CFG);
+};
+
+ROUTES['calibration/auc-vs-cal'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'AUC stable vs ECE drift — the same chart from overview',
+    `Same series as the overview, isolated for inspection. The takeaway is operational: a model whose ranking holds but whose calibration breaks is still broken in production for any threshold-based policy.`
+  ));
+  const c1 = chartCard('Daily AUC and ECE', '');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { x: dates, y: daily.map(d => d.auc), name: 'AUC', type: 'scatter', mode: 'lines', line: { color: COLORS.accent, width: 2 } },
+    { x: dates, y: daily.map(d => d.ece), name: 'ECE', type: 'scatter', mode: 'lines', yaxis: 'y2', line: { color: COLORS.bad, width: 2 } },
+  ], baseLayout({
+    yaxis: { title: 'AUC', range: [0.85, 0.96] },
+    yaxis2: { title: 'ECE', overlaying: 'y', side: 'right', range: [0, 0.07] },
+    height: 380,
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: dates[70], x1: dates[70], y0: 0, y1: 1, line: { color: '#ef4444', width: 1.4, dash: 'dash' } }],
+  }), CFG);
+
+  m.appendChild(makeCallout('Why this happens', `
+    AUC is invariant to monotone transforms of the score. If the new attack pattern just shifts <em>some</em> fraud transactions from score 0.6 → 0.7, ranking still works.
+    But absolute calibration is conditional on the score-to-fraud-rate map, which breaks when the underlying fraud distribution moves and the score distribution doesn't move with it. The ECE blow-up is the leading indicator that thresholds set last quarter are now picking up a different population than they were calibrated for.
+  `));
+};
+
+ROUTES['calibration/dual'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Dual signal check — fraud rate vs mean score',
+    `When realized fraud rate moves in your OOT window, the model's average score should move in the same direction with comparable magnitude. If fraud rate doubles and scores barely budge, the model is missing the new pattern — even if AUC measured on labels-you-eventually-got looks fine, because labels back-fill.`
+  ));
+
+  // Normalize both to z-scores around their pre-shift baseline (first 60 days)
+  const baseline = (arr, n) => { const m = arr.slice(0, n).reduce((a, b) => a + b, 0) / n; const s = Math.sqrt(arr.slice(0, n).reduce((a, b) => a + (b - m) ** 2, 0) / n); return arr.map(v => (v - m) / s); };
+  const z_fraud = baseline(daily.map(d => d.fraud_rate), 60);
+  const z_score = baseline(daily.map(d => d.mean_score), 60);
+
+  const c1 = chartCard('Fraud rate (z) vs mean model score (z) · 7-day smoothed',
+    'Both series should track each other inside the OOT window. Where the red line lifts and the purple line lags, the model is failing to react to the new signal.');
+  m.appendChild(c1.wrap);
+  const sm = (a, w = 7) => a.map((_, i) => { const lo = Math.max(0, i - w + 1); const sl = a.slice(lo, i + 1); return sl.reduce((x, y) => x + y, 0) / sl.length; });
+  Plotly.newPlot(c1.plot, [
+    { x: dates, y: sm(z_fraud), type: 'scatter', mode: 'lines', name: 'Realized fraud rate (z)', line: { color: COLORS.bad, width: 2.2 } },
+    { x: dates, y: sm(z_score), type: 'scatter', mode: 'lines', name: 'Mean model score (z)', line: { color: COLORS.compositional, width: 2.2 } },
+  ], baseLayout({
+    yaxis: { title: 'z-score (vs pre-shift baseline)' },
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: dates[70], x1: dates[70], y0: 0, y1: 1, line: { color: '#ef4444', width: 1.4, dash: 'dash' } }],
+    height: 380,
+  }), CFG);
+
+  // Rolling correlation
+  const window = 21;
+  const corr = dates.map((_, i) => {
+    if (i < window) return null;
+    const a = z_fraud.slice(i - window, i), b = z_score.slice(i - window, i);
+    const ma = a.reduce((x, y) => x + y, 0) / a.length, mb = b.reduce((x, y) => x + y, 0) / b.length;
+    let num = 0, da = 0, db = 0;
+    for (let k = 0; k < a.length; k++) { num += (a[k] - ma) * (b[k] - mb); da += (a[k] - ma) ** 2; db += (b[k] - mb) ** 2; }
+    return num / Math.sqrt(da * db);
+  });
+  const c2 = chartCard('Rolling 21-day correlation between fraud rate and mean score',
+    'Healthy: persistently >0.6. Falling toward zero or negative inside OOT means fraud is moving and score isn\'t — definitive concept drift.');
+  m.appendChild(c2.wrap);
+  Plotly.newPlot(c2.plot, [
+    { x: dates, y: corr, type: 'scatter', mode: 'lines', line: { color: COLORS.accent, width: 2 }, name: 'corr(fraud, score)' },
+  ], baseLayout({
+    yaxis: { title: 'Pearson r', range: [-0.3, 1] },
+    shapes: [
+      { type: 'line', xref: 'x', yref: 'paper', x0: dates[70], x1: dates[70], y0: 0, y1: 1, line: { color: '#ef4444', width: 1.4, dash: 'dash' } },
+      { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.6, y1: 0.6, line: { color: '#cbd5e1', width: 1, dash: 'dash' } },
+    ],
+    height: 280,
+  }), CFG);
+};
+
+/* -------------------- COHORTS -------------------- */
+ROUTES['cohorts'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Cohort slice stability',
+    `Stability across cohorts within OOT is more diagnostic than aggregate OOT performance. Slice by acquisition channel, account age, merchant segment, transaction amount band. A robust model degrades evenly; a fragile one collapses on one slice while looking fine in aggregate. The "New merchant (<30d)" row below is what fragility looks like.`
+  ));
+
+  const c1 = chartCard('Per-cohort: train AUC vs OOT AUC', 'Diagonal = no degradation. Cohorts far below the diagonal are where the model is failing on OOT despite the aggregate looking fine.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    {
+      x: cohorts.map(c => c.train_auc),
+      y: cohorts.map(c => c.oot_auc),
+      mode: 'markers+text',
+      type: 'scatter',
+      text: cohorts.map(c => c.name),
+      textposition: 'top right',
+      textfont: { size: 10, color: '#334155' },
+      marker: {
+        size: cohorts.map(c => 6 + Math.log10(c.n) * 1.5),
+        color: cohorts.map(c => (c.train_auc - c.oot_auc) > 0.05 ? COLORS.bad : (c.train_auc - c.oot_auc) > 0.02 ? COLORS.warn : COLORS.good),
+        line: { color: 'white', width: 1.5 },
+      },
+    },
+    { x: [0.78, 0.96], y: [0.78, 0.96], type: 'scatter', mode: 'lines', line: { color: '#cbd5e1', dash: 'dash' }, showlegend: false, hoverinfo: 'skip' },
+  ], baseLayout({
+    xaxis: { title: 'Train AUC', range: [0.78, 0.97] },
+    yaxis: { title: 'OOT AUC', range: [0.78, 0.97] },
+    showlegend: false, height: 420,
+  }), CFG);
+
+  // Fraud rate train→OOT
+  const c2 = chartCard('Per-cohort fraud rate · train → OOT', 'Where realized fraud rate jumps but the model\'s capture rate doesn\'t, that cohort is where the new attack pattern is concentrating.');
+  m.appendChild(c2.wrap);
+  Plotly.newPlot(c2.plot, [
+    { x: cohorts.map(c => c.name), y: cohorts.map(c => c.train_fraud), type: 'bar', name: 'Train', marker: { color: COLORS.train } },
+    { x: cohorts.map(c => c.name), y: cohorts.map(c => c.oot_fraud),   type: 'bar', name: 'OOT',   marker: { color: COLORS.oot } },
+  ], baseLayout({
+    barmode: 'group',
+    yaxis: { title: 'Fraud rate', tickformat: '.2%' },
+    height: 360,
+    margin: { t: 30, r: 20, b: 100, l: 60 },
+    xaxis: { tickangle: -25 },
+  }), CFG);
+
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Cohort detail</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  tbl.innerHTML = `
+    <thead><tr><th>Cohort</th><th>n</th><th>Train AUC</th><th>OOT AUC</th><th>Δ AUC</th><th>Train fraud</th><th>OOT fraud</th><th>FCR @ 2%</th><th>Status</th></tr></thead>
+    <tbody>${cohorts.map(c => {
+      const dauc = c.train_auc - c.oot_auc;
+      const status = dauc > 0.10 ? '<span class="pill pill-bad">collapse</span>' : dauc > 0.04 ? '<span class="pill pill-warn">degraded</span>' : '<span class="pill pill-good">stable</span>';
+      return `<tr ${dauc > 0.10 ? 'class="hl"' : ''}><td>${c.name}</td><td>${c.n.toLocaleString()}</td><td>${c.train_auc.toFixed(3)}</td><td>${c.oot_auc.toFixed(3)}</td><td>${dauc.toFixed(3)}</td><td>${(c.train_fraud*100).toFixed(2)}%</td><td>${(c.oot_fraud*100).toFixed(2)}%</td><td>${(c.fcr_at_2pct*100).toFixed(0)}%</td><td>${status}</td></tr>`;
+    }).join('')}</tbody>`;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+
+  m.appendChild(makeCallout('What aggregate OOT AUC misses', `
+    Aggregate OOT AUC for the model is 0.93 — perfectly defensible in a model-review meeting.
+    Inside that, "New merchant (&lt;30d)" has dropped from 0.925 → 0.798 with fraud rate 2.4× the training period. This cohort is small relative to total volume, so it doesn't move the headline number, but it represents a concentrated failure mode that threshold-based policy will eat at production thresholds. Cohort slicing is the cheapest way to find these before they find you.
+  `, 'bad'));
+};
+
+/* -------------------- LABEL MATURITY -------------------- */
+ROUTES['maturity/curve'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Chargeback maturation curve',
+    `Fraud labels mature over the dispute and chargeback cycle. The shape of this curve is what determines how recent your OOT window can be without conflating label censoring with model degradation. Here, 95% of chargebacks are recognized within ${idx95} days of authorization.`
+  ));
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi"><div class="kpi-l">95% maturity</div><div class="kpi-v">${idx95}d</div><div class="kpi-s">recommended OOT cutoff</div></div>
+    <div class="kpi"><div class="kpi-l">50% maturity</div><div class="kpi-v">${matureCDF.findIndex(v => v >= 0.5)}d</div><div class="kpi-s">half of disputes filed</div></div>
+    <div class="kpi"><div class="kpi-l">99% maturity</div><div class="kpi-v">${matureCDF.findIndex(v => v >= 0.99)}d</div><div class="kpi-s">conservative cutoff</div></div>
+    <div class="kpi"><div class="kpi-l">Day-7 visible fraud</div><div class="kpi-v">${fmtPct(matureCDF[7], 0)}</div><div class="kpi-s">why "last week" looks low</div></div>
+  `;
+  m.appendChild(kpis);
+
+  const c1 = chartCard('Cumulative share of chargebacks recognized by days-since-auth',
+    'Empirical CDF of label arrival. The 95% line sets the conservative OOT boundary; pulling more recent data risks measuring missing labels rather than missing predictions.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [{
+    x: matureDays, y: matureCDF, type: 'scatter', mode: 'lines',
+    line: { color: COLORS.accent, width: 2.5 }, fill: 'tozeroy', fillcolor: 'rgba(99,102,241,0.10)',
+    name: 'visible / true',
+  }], baseLayout({
+    xaxis: { title: 'Days since authorization' },
+    yaxis: { title: 'Visible fraud share', tickformat: '.0%' },
+    shapes: [
+      { type: 'line', xref: 'x', yref: 'y', x0: idx95, x1: idx95, y0: 0, y1: 0.95, line: { color: COLORS.bad, width: 1.5, dash: 'dash' } },
+      { type: 'line', xref: 'x', yref: 'y', x0: 0, x1: idx95, y0: 0.95, y1: 0.95, line: { color: COLORS.bad, width: 1.5, dash: 'dash' } },
+    ],
+    annotations: [{ x: idx95, y: 0.95, text: `95% at ${idx95}d`, ax: 60, ay: -20, font: { size: 11, color: COLORS.bad } }],
+    height: 400,
+  }), CFG);
+};
+
+ROUTES['maturity/censoring'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Label censoring effect on apparent OOT degradation',
+    `If the OOT window includes recent days where labels haven't matured, the apparent fraud rate is depressed and the apparent model performance looks artificially good. Conversely, if you compare a fully-matured train window to a partially-matured OOT window, you can mistake label censoring for model improvement <em>or</em> model degradation depending on what metric you're using. The fix is the ${idx95}-day cutoff — but it has consequences for threshold-setting.`
+  ));
+
+  const c1 = chartCard('Apparent vs true fraud rate by OOT lookback', 'Pulling OOT closer to "now" depresses the apparent fraud rate because labels haven\'t arrived yet. The gap closes asymptotically.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { x: lookback.map(r => r.d), y: lookback.map(r => r.true_fr), type: 'scatter', mode: 'lines', name: 'True fraud rate', line: { color: COLORS.bad, width: 2, dash: 'dash' } },
+    { x: lookback.map(r => r.d), y: lookback.map(r => r.apparent), type: 'scatter', mode: 'lines', name: 'Apparent fraud rate', line: { color: COLORS.accent, width: 2.5 } },
+  ], baseLayout({
+    xaxis: { title: 'Days between OOT end and "now"' },
+    yaxis: { title: 'Fraud rate', tickformat: '.2%' },
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: idx95, x1: idx95, y0: 0, y1: 1, line: { color: COLORS.good, width: 1.5, dash: 'dash' } }],
+    annotations: [{ xref: 'x', yref: 'paper', x: idx95, y: 1.02, text: 'OOT cutoff', showarrow: false, font: { color: COLORS.good, size: 10 }, xanchor: 'left' }],
+    height: 380,
+  }), CFG);
+
+  m.appendChild(makeCallout('The threshold-setting tension', `
+    The ${idx95}-day cutoff cleanly handles OOT <em>evaluation</em>. But for threshold-setting it's not the whole story: thresholds are typically set on a calibration window where you want
+    <strong>both</strong> mature labels <strong>and</strong> a recent-enough score distribution to reflect production. Those pull in opposite directions. The compromise is a calibration window that ends ${idx95} days ago and is one or two weeks long — recent enough to reflect current dynamics but old enough that labels are mature.
+    The "Threshold construction" pages walk through what you give up if you violate this on either side.
+  `, 'info'));
+};
+
+/* -------------------- THRESHOLD CONSTRUCTION -------------------- */
+function plotHist(plot, hist, color, name) {
+  const centers = hist.edges.slice(0, -1).map((e, i) => (e + hist.edges[i + 1]) / 2);
+  return { x: centers, y: hist.counts, type: 'bar', name, marker: { color, opacity: 0.8 }, width: 1 / 30 };
+}
+ROUTES['thresholds/distributions'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Score distributions in three worlds',
+    `Same model, three populations: training (in-sample), the dedicated calibration window (held out, pre-OOT), and the most recent week of scored production data. Train scores are artificially sharp because the model has memorized the training set. Recent-week scores are shifted right because the regime has moved. The calibration window in the middle is the cleanest signal for threshold-setting.`
+  ));
+
+  const c1 = chartCard('Score distribution overlay', 'Train (gray, in-sample, artificially separated) — Calibration (blue, held-out, mature labels) — Recent week (red, no mature labels, contaminated by prior model\'s policy).');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    plotHist(c1.plot, histTrain,  COLORS.train,  'Training (in-sample)'),
+    plotHist(c1.plot, histCal,    COLORS.cal,    'Calibration window'),
+    plotHist(c1.plot, histRecent, COLORS.recent, 'Recent week'),
+  ], baseLayout({
+    barmode: 'overlay',
+    xaxis: { title: 'Model score' },
+    yaxis: { title: 'Count' },
+    height: 400,
+  }), CFG);
+
+  m.appendChild(makeCallout('Why training scores are misleading for binning', `
+    Tree-boosted models — especially with hundreds of features — produce score distributions on training data that are sharper and more bimodal than what you'll see on any unseen population.
+    The model has memorized enough that the histogram is artificially separated. Even-volume bin edges cut on these scores will sit at thresholds nothing in production actually clears — bin populations will be wildly uneven on day one.
+    This is a structural property of how these models fit, not an overfitting artifact you can engineer away with regularization or early stopping.
+  `, 'bad'));
+};
+
+ROUTES['thresholds/edges'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Bin edges from three threshold-setting strategies',
+    `Same target — 10 even-volume bins. Edges differ depending on which population you cut on. Training-data edges are pushed to extremes; recent-week edges are noisy because they're cut on a small sample where the highest-risk tail is sparse; calibration-window edges sit between them and are the most defensible.`
+  ));
+
+  const c1 = chartCard('Bin edges, three strategies', 'X-axis is the score; vertical lines are the 10-bin edges. Compare the spacing and tail behavior.');
+  m.appendChild(c1.wrap);
+  const traces = [];
+  const yMap = { Training: 0, Calibration: 1, 'Recent week': 2 };
+  const colorMap = { Training: COLORS.train, Calibration: COLORS.cal, 'Recent week': COLORS.recent };
+  const edgesMap = { Training: edgesTrain, Calibration: edgesCal, 'Recent week': edgesRecent };
+  for (const [k, edges] of Object.entries(edgesMap)) {
+    edges.slice(1, -1).forEach(e => {
+      traces.push({
+        x: [e, e], y: [yMap[k] - 0.4, yMap[k] + 0.4], type: 'scatter', mode: 'lines',
+        line: { color: colorMap[k], width: 2 }, showlegend: false, hoverinfo: 'x',
+      });
+    });
+    traces.push({ x: [edges[0], edges[edges.length - 1]], y: [yMap[k], yMap[k]], type: 'scatter', mode: 'lines', line: { color: colorMap[k], width: 1 }, name: k });
+  }
+  Plotly.newPlot(c1.plot, traces, baseLayout({
+    xaxis: { title: 'Score', range: [0, 1] },
+    yaxis: { tickvals: [0, 1, 2], ticktext: ['Training', 'Calibration', 'Recent week'], range: [-0.7, 2.7] },
+    height: 320,
+    showlegend: false,
+  }), CFG);
+
+  // Edge-by-edge table
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Edge values</div><div class="chart-s">Notice how training-data edges concentrate at low scores then jump — symptom of the in-sample distribution.</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  let rows = '<thead><tr><th>Bin</th><th>Train edge</th><th>Calibration edge</th><th>Recent edge</th><th>Train − Cal</th></tr></thead><tbody>';
+  for (let i = 1; i < 10; i++) {
+    const tr = edgesTrain[i], ca = edgesCal[i], re = edgesRecent[i];
+    rows += `<tr><td>D${i}/D${i + 1}</td><td>${tr.toFixed(3)}</td><td>${ca.toFixed(3)}</td><td>${re.toFixed(3)}</td><td>${(tr - ca).toFixed(3)}</td></tr>`;
+  }
+  rows += '</tbody>';
+  tbl.innerHTML = rows;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+};
+
+ROUTES['thresholds/population'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Bin volume drift after deploy',
+    `Apply each set of bin edges to the actually-deployed score distribution. With even-volume bins, all three strategies should produce 10% per bin if their assumed distribution matched reality. Training-edge deployment is wildly off because in-sample scores are artificially separated. Calibration-window edges are within ±10–15% — what we'd consider acceptable noise. Recent-week edges are biased high because the recent week is a small sample of an already-shifted distribution.`
+  ));
+
+  const labels = Array.from({ length: 10 }, (_, i) => 'D' + (i + 1));
+  const c1 = chartCard('Per-bin population share when each strategy is deployed against today\'s distribution',
+    'Target = 10% per bin (dashed). Distance from 10% measures how miscalibrated the chosen edges are against actual production traffic.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { x: labels, y: volTrainEdges.map(v => v * 100), name: 'Training edges', type: 'bar', marker: { color: COLORS.train } },
+    { x: labels, y: volCalEdges.map(v => v * 100),   name: 'Calibration edges', type: 'bar', marker: { color: COLORS.cal } },
+    { x: labels, y: volRecentEdges.map(v => v * 100), name: 'Recent-week edges', type: 'bar', marker: { color: COLORS.recent } },
+  ], baseLayout({
+    barmode: 'group',
+    yaxis: { title: '% of population' },
+    shapes: [{ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 10, y1: 10, line: { color: '#94a3b8', width: 1, dash: 'dash' } }],
+    height: 380,
+  }), CFG);
+
+  const c2 = chartCard('Deviation from 10% target',
+    'Sum of |bin% − 10%| across bins. Lower is better. Calibration-window edges are dramatically more accurate to production reality.');
+  m.appendChild(c2.wrap);
+  const dev = (arr) => arr.reduce((a, v) => a + Math.abs(v * 100 - 10), 0);
+  Plotly.newPlot(c2.plot, [{
+    x: ['Training', 'Calibration', 'Recent week'],
+    y: [dev(volTrainEdges), dev(volCalEdges), dev(volRecentEdges)],
+    type: 'bar',
+    marker: { color: [COLORS.train, COLORS.cal, COLORS.recent] },
+    text: [dev(volTrainEdges), dev(volCalEdges), dev(volRecentEdges)].map(v => v.toFixed(1)),
+    textposition: 'outside',
+  }], baseLayout({ yaxis: { title: 'Σ |bin% − 10%|' }, height: 280, showlegend: false }), CFG);
+};
+
+ROUTES['thresholds/isotonic'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Isotonic-then-bin stability',
+    `Calibrate raw scores to actual fraud rate (isotonic / Platt) on the calibration window <em>before</em> binning, and the bin edges become anchored to fraud-rate quantiles rather than score quantiles. When the model retrains and raw scores shift, calibrated bin populations move much less. Same data, two strategies, plotted week by week.`
+  ));
+
+  const c1 = chartCard('Weekly bin-population stability · raw vs isotonic-calibrated',
+    'Each line is one bin\'s share of weekly population. Raw-score binning shows visible drift after week 6; isotonic-calibrated binning is much tighter.');
+  m.appendChild(c1.wrap);
+  const palette = ['#0ea5e9','#06b6d4','#10b981','#84cc16','#fbbf24','#f59e0b','#fb923c','#f97316','#ef4444','#dc2626'];
+  const traces = [];
+  for (let k = 0; k < 10; k++) {
+    traces.push({
+      x: Array.from({ length: 12 }, (_, w) => 'W' + (w + 1)),
+      y: rawBins.map(b => b[k]),
+      type: 'scatter', mode: 'lines+markers',
+      name: `D${k+1} raw`, line: { color: palette[k], width: 1.4, dash: 'dot' },
+      marker: { size: 4 }, legendgroup: 'raw', showlegend: k === 0,
+      xaxis: 'x', yaxis: 'y',
+    });
+  }
+  for (let k = 0; k < 10; k++) {
+    traces.push({
+      x: Array.from({ length: 12 }, (_, w) => 'W' + (w + 1)),
+      y: isoBins.map(b => b[k]),
+      type: 'scatter', mode: 'lines+markers',
+      name: `D${k+1} iso`, line: { color: palette[k], width: 1.8 },
+      marker: { size: 4 }, legendgroup: 'iso', showlegend: k === 0,
+      xaxis: 'x2', yaxis: 'y2',
+    });
+  }
+  Plotly.newPlot(c1.plot, traces, baseLayout({
+    grid: { rows: 1, columns: 2, pattern: 'independent' },
+    xaxis:  { title: 'Raw-score binning', anchor: 'y' },
+    xaxis2: { title: 'Isotonic-then-bin', anchor: 'y2' },
+    yaxis:  { title: 'Per-bin share', range: [0, 0.22], tickformat: '.0%' },
+    yaxis2: { range: [0, 0.22], tickformat: '.0%', matches: 'y' },
+    height: 380, showlegend: false,
+  }), CFG);
+
+  m.appendChild(makeCallout('Operational benefit', `
+    Calibration-anchored bins survive normal model retraining because retraining shifts the raw-score scale but not the score-to-fraud-rate map. This means downstream policy
+    (decline thresholds, queue routing, customer-facing risk tiers) does not need to be re-tuned every refresh. It also makes monitoring cleaner: drift in calibrated bins is a stronger signal of concept drift, because input-distribution drift has been substantially absorbed by the calibration step.
+  `, 'good'));
+};
+
+/* -------------------- POST-DEPLOY MONITORING -------------------- */
+ROUTES['monitoring'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Post-deploy monitoring · concept vs input drift',
+    `Two complementary metrics, different remediations. <strong>Bin volume drift</strong> (the score distribution is moving) suggests rebinning may suffice — input drift. <strong>Bin fraud-rate drift</strong> (the score-to-fraud-rate map is breaking) requires retraining — concept drift. Conflating them produces the wrong response.`
+  ));
+
+  const days = monitor.map(r => r.i);
+  const c1 = chartCard('Daily input-drift and concept-drift indices',
+    'Input drift (KL of bin volumes) starts moving first; concept drift (per-bin fraud-rate divergence) lags but eventually exceeds it. The gap between them is the early warning window.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { x: days, y: monitor.map(r => r.inputDrift), type: 'scatter', mode: 'lines', name: 'Input drift (bin volume KL)', line: { color: COLORS.accent, width: 2 } },
+    { x: days, y: monitor.map(r => r.conceptDrift), type: 'scatter', mode: 'lines', name: 'Concept drift (bin fraud-rate)', line: { color: COLORS.bad, width: 2 } },
+  ], baseLayout({
+    xaxis: { title: 'Days since deploy' },
+    yaxis: { title: 'Drift index' },
+    shapes: [
+      { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.10, y1: 0.10, line: { color: '#94a3b8', width: 1, dash: 'dash' } },
+      { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.20, y1: 0.20, line: { color: '#fb923c', width: 1, dash: 'dash' } },
+    ],
+    annotations: [
+      { xref: 'paper', x: 0.99, y: 0.10, text: 'rebinning threshold', showarrow: false, font: { size: 9, color: '#94a3b8' }, xanchor: 'right' },
+      { xref: 'paper', x: 0.99, y: 0.20, text: 'retrain threshold', showarrow: false, font: { size: 9, color: '#fb923c' }, xanchor: 'right' },
+    ],
+    height: 380,
+  }), CFG);
+
+  // Decision matrix
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Drift response decision matrix</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  tbl.innerHTML = `
+    <thead><tr><th></th><th>Concept low</th><th>Concept high</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Input low</strong></td><td><span class="pill pill-good">healthy</span> · keep monitoring</td><td><span class="pill pill-bad">target relationship broken</span> · retrain on recent data, investigate why population is stable but signal moved</td></tr>
+      <tr><td><strong>Input high</strong></td><td><span class="pill pill-warn">mix shift only</span> · rebinning sufficient if calibration holds; consider segment-conditional retraining</td><td><span class="pill pill-bad">full regime change</span> · retrain end-to-end; do not just rebin</td></tr>
+    </tbody>`;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+
+  m.appendChild(makeCallout('Tying it back', `
+    The story across this hub: input drift (population shifted) and concept drift (relationship broke) <em>can</em> happen separately. The headline AUC dashboard collapses both into one number that hides which is happening. The decompositions on the previous pages —
+    feature buckets, conditional PSI, decile drift, dual-signal correlation, cohort slice degradation, calibration-vs-AUC — are the diagnostic tools that let you tell the difference and respond appropriately. None of them are individually new; the discipline is in running all of them and reading them together.
+  `, 'info'));
+};
+
+/* ============================================================================
+   Helpers + boot
+   ============================================================================ */
+function makeCallout(title, body, kind) {
+  const c = el('div', 'alert ' + (kind || 'info'));
+  c.innerHTML = `<div><strong>${title}.</strong> ${body}</div>`;
+  return c;
+}
+function main() { return document.getElementById('main'); }
+function navEl() { return document.getElementById('nav'); }
+function crumbsEl() { return document.getElementById('crumbs'); }
+function topEl() { return document.getElementById('topstats'); }
+
+const collapsedSections = new Set();
+let currentPath = 'overview';
+
+function navigate(path) {
+  // purge any plotly elements
+  main().querySelectorAll('div').forEach(d => { try { Plotly.purge(d); } catch (e) {} });
+  currentPath = path;
+  location.hash = '#/' + path;
+  renderCrumbs();
+  updateActive();
+  render();
+}
+
+function render() {
+  main().innerHTML = '';
+  const fn = ROUTES[currentPath] || ROUTES['overview'];
+  fn();
+}
+
+function renderNav() {
+  navEl().innerHTML = '';
+  NAV.forEach(sec => {
+    if (sec.kind === 'direct') {
+      const e = el('div', 'nav-direct');
+      e.dataset.path = sec.id;
+      e.innerHTML = `<span>${sec.title}</span>${sec.badge ? `<span class="badge ${sec.badgeKind ? 'badge-' + sec.badgeKind : ''}">${sec.badge}</span>` : ''}`;
+      e.onclick = () => navigate(sec.id);
+      navEl().appendChild(e);
+    } else {
+      const sectionEl = el('div', 'nav-section');
+      if (collapsedSections.has(sec.id)) sectionEl.classList.add('collapsed');
+      const head = el('div', 'nav-head');
+      head.innerHTML = `<span>${sec.title}</span>${sec.badge ? `<span class="badge badge-${sec.badgeKind || ''}">${sec.badge}</span>` : ''}<span class="chev">▼</span>`;
+      head.onclick = () => {
+        if (collapsedSections.has(sec.id)) collapsedSections.delete(sec.id);
+        else collapsedSections.add(sec.id);
+        sectionEl.classList.toggle('collapsed');
+      };
+      sectionEl.appendChild(head);
+      const items = el('div', 'nav-items');
+      (sec.children || []).forEach(sub => {
+        const item = el('div', 'nav-item');
+        const path = `${sec.id}/${sub.id}`;
+        item.dataset.path = path;
+        item.innerHTML = `<span>${sub.title}</span>${sub.badge ? `<span class="badge">${sub.badge}</span>` : ''}`;
+        item.onclick = () => navigate(path);
+        items.appendChild(item);
+      });
+      sectionEl.appendChild(items);
+      navEl().appendChild(sectionEl);
+    }
+  });
+  updateActive();
+}
+
+function updateActive() {
+  document.querySelectorAll('.nav-item, .nav-direct').forEach(e => {
+    e.classList.toggle('active', e.dataset.path === currentPath);
+  });
+}
+
+function renderCrumbs() {
+  const parts = currentPath.split('/');
+  let crumbs = ['<strong>Stability & Calibration</strong>'];
+  if (parts[0]) {
+    const sec = NAV.find(s => s.id === parts[0]);
+    crumbs.push('<span class="sep">›</span>');
+    crumbs.push(parts[1] ? `<span>${sec?.title || parts[0]}</span>` : `<strong>${sec?.title || parts[0]}</strong>`);
+    if (parts[1]) {
+      const sub = sec?.children?.find(c => c.id === parts[1]);
+      crumbs.push('<span class="sep">›</span>');
+      crumbs.push(`<strong>${sub?.title || parts[1]}</strong>`);
+    }
+  }
+  crumbsEl().innerHTML = crumbs.join(' ');
+}
+
+function renderTopstats() {
+  const meanAUC = daily.slice(-30).reduce((a, b) => a + b.auc, 0) / 30;
+  const meanECE = daily.slice(-30).reduce((a, b) => a + b.ece, 0) / 30;
+  topEl().innerHTML = `
+    <div class="tstat"><span>OOT</span><strong>AUC ${meanAUC.toFixed(3)}</strong></div>
+    <span class="tstat-sep">·</span>
+    <div class="tstat"><span>ECE</span><strong>${meanECE.toFixed(3)}</strong></div>
+    <span class="tstat-sep">·</span>
+    <div class="tstat"><span>ADV-AUC</span><strong>${ADV_AUC.toFixed(3)}</strong></div>
+    <span class="tstat-sep">·</span>
+    <div class="tstat"><span>maturity</span><strong>${idx95}d</strong></div>
+  `;
+}
+
+// boot
+window.addEventListener('hashchange', () => {
+  const p = location.hash.replace(/^#\/?/, '') || 'overview';
+  if (p !== currentPath) { currentPath = p; renderCrumbs(); updateActive(); render(); }
+});
+renderNav();
+renderTopstats();
+const initial = location.hash.replace(/^#\/?/, '') || 'overview';
+currentPath = initial;
+renderCrumbs();
+updateActive();
+render();
+</script>
+</body>
+</html>

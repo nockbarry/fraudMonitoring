@@ -1,0 +1,228 @@
+● Stability & Calibration Monitoring Hub — Requirements
+
+  0. Global / framework
+
+  - G1. Single standalone HTML file. No external assets except Plotly via CDN (plotly-2.35.0.min.js).
+  - G2. Self-contained synthetic data; deterministic across reloads. Use a seeded PRNG (mulberry32) and a Box-Muller gauss()
+  helper. Single seed constant at top of script.
+  - G3. All charts use a shared baseLayout() with: Inter font stack 11px, white paper/plot background, horizontal legend below
+  plot at y=−0.18, common margins.
+  - G4. Common color tokens: invariant=#0ea5e9, tactical=#f59e0b, compositional=#a855f7, accent=#6366f1, good=#10b981,
+  warn=#f59e0b, bad=#ef4444, train=#64748b, cal=#0ea5e9, oot=#7c3aed, recent=#ef4444.
+  - G5. Hash-based router: #/<section> or #/<section>/<sub>. Back/forward navigation must work via hashchange.
+  - G6. On every navigation: purge existing Plotly elements, clear #main, re-render page from a route table.
+  - G7. Helper functions required: el(tag, cls, html), pageHeader(title, desc), chartCard(title, sub, height),
+  baseLayout(extra), fmtPct(v, d), fmt(v, d), makeCallout(title, body, kind).
+  - G8. Callout kinds: info (indigo), good (green), warn (amber), bad (red).
+  - G9. Pill kinds: pill-good, pill-warn, pill-bad, pill-accent, pill-inv, pill-tac, pill-cmp.
+
+  1. Layout / chrome
+
+  - L1. Two-pane app: 280px dark sidebar (#0f172a), light main content area.
+  - L2. Sidebar contains: hub title with accent square, sub-label, two cross-hub links (Model Performance Hub, Feature Analysis
+   Hub), nav tree, footer line.
+  - L3. Nav tree supports two item kinds: direct (one click navigates) and section with children. Sections collapse/expand on
+  click; chevron rotates.
+  - L4. Optional badges on nav items (e.g. AUC 0.78 warn, live accent).
+  - L5. Topbar (56px) with breadcrumbs on the left, comma-separated topstat strip on the right showing OOT AUC, ECE, ADV-AUC,
+  maturity-day count.
+  - L6. Breadcrumbs format: Stability & Calibration › <Section> › <Subsection>. Last crumb bolded.
+  - L7. Page header pattern: 20px bold title + 13px description paragraph (max 880px wide, line-height 1.55).
+  - L8. KPI grid: 4 columns at desktop, 2 at <1100px, with optional left border accent (accent/good/warn/bad).
+  - L9. Chart card pattern: bordered white card, head with title + optional subtitle, plot div with configurable height
+  (default 360px).
+  - L10. Tables: .rt-tbl style — uppercase 11px column headers, tabular-nums in cells, .hl class for emphasized rows.
+
+  2. Synthetic data model
+
+  - D1. Timeline: 120 daily observations starting 2026-01-01, formatted as ISO date strings.
+  - D2. Regime shift: feature/score behavior changes starting at day index 70, ramping to full effect by ~day 95.
+  - D3. Feature catalog (≥150 features):
+    - 20 hand-named features with realistic fraud-domain names (e.g. device_entropy_24h, velocity_amt_card_1h,
+  embed_merchant_d8).
+    - ~130 padded feat_NNN features with exponentially decaying gain.
+    - Each feature has: name, bucket (invariant/tactical/compositional), gain, stable_target (bool), drift_psi.
+    - Gains renormalize to sum to 1; sorted descending.
+  - D4. Daily series per day: fraud_rate, mean_score, auc, ece, top_decile fraud rate. AUC stays in 0.90–0.93 band; ECE
+  quadruples post-shift; mean score lifts only partially relative to fraud rate.
+  - D5. Adversarial validation block: scalar ADV_AUC=0.781 and a list of ~10 top discriminator features with name, imp, note.
+  Notes encode bucket via substring (invariant/tactical/compositional).
+  - D6. Decile fraud-rate matrix: 10 deciles × 120 days. Baseline rate per decile increasing geometrically. Top deciles
+  (D8–D10) drift up post-day-70.
+  - D7. Score histogram generator producing 30 bins on [0, 1] for three populations:
+    - Training: high separation factor, no shift, no noise → bimodal.
+    - Calibration: moderate separation, small right shift, light noise.
+    - Recent week: moderate separation, larger right shift, more noise.
+    - Plus a "deployed" population for evaluating bin edges against reality.
+  - D8. Decile bin-edge function: produces 11 quantile-based edges from a histogram.
+  - D9. Apply-edges function: returns per-bin population share when arbitrary edges are evaluated against an arbitrary
+  histogram.
+  - D10. Weekly bin-population matrices: 12 weeks × 10 bins, two versions (raw-score-binned drifts post-week-6, isotonic-binned
+   much tighter).
+  - D11. Cohort table: ~7 cohorts each with name, n, train_fraud, oot_fraud, train_auc, oot_auc, fcr_at_2pct. At least one
+  cohort must show OOT-AUC collapse (Δ > 0.10) hidden inside healthy aggregate.
+  - D12. Maturation curve: 91-day Weibull-shaped CDF reaching 95% at 40 days; expose idx95 and 50/99% lookups.
+  - D13. Apparent-vs-true fraud rate by lookback: true_fr constant, apparent = true_fr * matureCDF[d].
+  - D14. Conditional PSI table: ~15 features with marg, cond, bucket, verdict ∈ {real shift, partial, mix change, minor,
+  stable}.
+  - D15. Post-deploy monitoring: 60-day series of inputDrift and conceptDrift; concept drift inflects later but exceeds input
+  drift.
+
+  3. Pages and routes
+
+  3.1 overview (direct)
+
+  - P1. Page header with multi-paragraph context describing the regime-shift narrative.
+  - P2. First KPI row (4 cards): top-10 importance share (accent), stable-target share (good), tactical-bucket share (warn),
+  adversarial AUC (bad).
+  - P3. Second KPI row (4 cards): mean OOT AUC, OOT ECE (bad), top-decile fraud rate vs early baseline (warn), 95% chargeback
+  maturity day (accent).
+  - P4. Indigo callout titled "Why this page exists" framing the AUC-vs-calibration disagreement.
+  - P5. Chart: dual-axis line — daily AUC (left) and ECE (right) with regime-shift dashed vertical at day 70 and "regime shift
+  starts" annotation.
+
+  3.2 features/concentration
+
+  - P6. Page header, 4 KPIs (top-10 share with conditional good/warn coloring, top-20 share, stable-target share,
+  single-feature max with feature name in subtitle).
+  - P7. Chart: cumulative-importance Lorenz curve with filled area + uniform-baseline dashed line + dotted reference lines
+  marking the (10, top10share) point with annotation.
+  - P8. Chart: top-20 horizontal bar chart, bars colored by bucket, bucket name as outside text, height 480px, reversed y-axis.
+  - P9. Bottom callout on "≥60% stable-target" being a heuristic and concentration as a single-feature failure mode.
+
+  3.3 features/buckets
+
+  - P10. Page header with inline pills illustrating the three buckets.
+  - P11. Two-column row:
+    - Donut pie of bucket share of cumulative gain, hole=0.5, outside labels.
+    - Vertical bar of mean PSI by bucket, with horizontal reference lines at PSI=0.10 (gray) and PSI=0.25 (orange) plus
+  right-anchored annotations.
+  - P12. Reference table: bucket, what it captures, expected behavior, what a >0.25 PSI means, count of features, gain share.
+
+  3.4 features/psi
+
+  - P13. Page header on conditional PSI rationale.
+  - P14. Scatter chart: marginal PSI (x) vs conditional PSI (y), points colored by bucket, feature name as top right text
+  label, diagonal y=x reference dashed gray, two highlight rectangles (mix-change zone amber, real-shift zone red) with
+  anchored annotations.
+  - P15. Table: feature, bucket pill, marginal PSI, conditional PSI, Δ, verdict pill.
+
+  3.5 adversarial (direct)
+
+  - P16. Page header, badge AUC 0.78 shown in nav.
+  - P17. 4 KPIs: adversarial AUC (bad), top discriminator share (warn), tactical features in top-10, invariant features in
+  top-10 (good, with text "flag if >1–2").
+  - P18. Horizontal bar chart of top discriminators colored by bucket inferred from notes, note as outside text.
+  - P19. Bad-style callout titled "Reading the result" recommending discounted OOT AUC and feature transformation.
+
+  3.6 calibration/deciles
+
+  - P20. Page header.
+  - P21. Chart: 10 line traces (one per decile) on log-y, palette grading from gray to red, top-3 deciles thicker. Regime-shift
+   dashed vertical and annotation. Height 460.
+  - P22. Chart: zoomed D10 line with shaded area post-day-70 (linear y, height 280).
+
+  3.7 calibration/auc-vs-cal
+
+  - P23. Same dual-axis AUC/ECE chart as overview, isolated for inspection (height 380).
+  - P24. "Why this happens" callout explaining ranking-invariance of AUC.
+
+  3.8 calibration/dual
+
+  - P25. Page header on dual-signal check.
+  - P26. Chart: z-scored fraud rate and mean score (both 7-day smoothed, baselined on first 60 days), regime-shift dashed line.
+  - P27. Chart: 21-day rolling Pearson correlation with reference line at 0.6 and the regime-shift dashed vertical (height 280,
+   y-range [−0.3, 1]).
+
+  3.9 cohorts (direct)
+
+  - P28. Page header.
+  - P29. Chart: train-AUC vs OOT-AUC scatter, marker size scaled by log10(n), color conditional on Δ AUC (good/warn/bad),
+  labels above-right, diagonal dashed reference.
+  - P30. Chart: grouped bars, train fraud rate vs OOT fraud rate per cohort, x-tick angle −25°, height 360.
+  - P31. Cohort detail table: cohort, n, train AUC, OOT AUC, ΔAUC, train fraud, OOT fraud, FCR @ 2%, status pill. Row with
+  collapse should use .hl class.
+  - P32. Bad callout "What aggregate OOT AUC misses" naming the collapsed cohort.
+
+  3.10 maturity/curve
+
+  - P33. Page header parameterized by idx95.
+  - P34. 4 KPIs: 95%, 50%, 99% maturity days, day-7 visible-fraud share.
+  - P35. Chart: filled CDF, two perpendicular dashed reference lines forming a corner at (idx95, 0.95), annotation "95% at Xd".
+
+  3.11 maturity/censoring
+
+  - P36. Page header.
+  - P37. Chart: apparent vs true fraud rate by lookback days; true is dashed red constant, apparent is solid accent. Vertical
+  dashed at idx95 with "OOT cutoff" annotation.
+  - P38. Info callout on the threshold-setting tension between mature labels and recent score distribution.
+
+  3.12 thresholds/distributions
+
+  - P39. Page header.
+  - P40. Chart: three score-distribution histograms in barmode: 'overlay' with opacity 0.8, bar width 1/30. Legend names:
+  Training (in-sample), Calibration window, Recent week.
+  - P41. Bad callout on why training scores mislead bin construction.
+
+  3.13 thresholds/edges
+
+  - P42. Page header.
+  - P43. Chart: three horizontal "tick" rows showing bin-edge positions per strategy (training/calibration/recent), each
+  interior edge drawn as a short vertical line, baselines as full-width horizontal connectors. Y-axis tick labels are the
+  strategy names, x-axis is the score [0,1]. Height 320.
+  - P44. Edge values table: bin pair, train edge, calibration edge, recent edge, train−cal delta.
+
+  3.14 thresholds/population
+
+  - P45. Page header.
+  - P46. Chart: grouped bars per bin (D1–D10), three groups (training/cal/recent edges), with horizontal dashed reference at
+  10%.
+  - P47. Chart: total deviation Σ|bin% − 10%| per strategy as a 3-bar comparison with values as outside text labels
+  (height 280).
+
+  3.15 thresholds/isotonic
+
+  - P48. Page header.
+  - P49. Chart: 1×2 plotly grid (grid: {rows:1, columns:2, pattern:'independent'}) — left subplot raw-score binning across 12
+  weeks, right subplot isotonic-then-bin across 12 weeks. 10 bin lines per subplot, dotted in raw, solid in iso, palette
+  grading from cyan to red. Y-axes matched. Both subplots ticked as percentages [0, 22%].
+  - P50. Good callout titled "Operational benefit" describing why calibrated bins survive retraining.
+
+  3.16 monitoring (direct, badge live accent)
+
+  - P51. Page header.
+  - P52. Chart: input drift (accent) and concept drift (bad) over 60 days, with horizontal dashed reference lines at 0.10
+  ("rebinning threshold") and 0.20 ("retrain threshold"), right-anchored annotations.
+  - P53. 2×2 decision matrix table: rows {Input low, Input high}, columns {Concept low, Concept high}, cells contain status
+  pill and recommended action.
+  - P54. Info callout closing the loop ("Tying it back").
+
+  4. Interactions
+
+  - I1. Click any nav item → route changes, page renders, hash updates.
+  - I2. Section heads in the nav toggle collapsed state via class toggle, persisted in collapsedSections Set for the lifetime
+  of the page.
+  - I3. Active nav item gets .active class with accent left border + tinted background; updated on every render.
+  - I4. Browser back/forward triggers hashchange → route resolves and renders without full reload.
+  - I5. Cross-hub links in the sidebar are plain <a href> to the other two HTML files in the directory.
+  - I6. Plotly charts are responsive (responsive: true, no modebar).
+  - I7. Hover tooltips on chart traces show formatted values; PSI scatter additionally specifies a hovertemplate showing
+  feature name and both PSI values.
+  - I8. No client-side state beyond current path and collapsed sections — everything else is derived from the synthetic data
+  block.
+
+  5. Acceptance criteria
+
+  - A1. File loads in a modern browser with no console errors.
+  - A2. All 16 pages render distinct content with at least one chart or table each.
+  - A3. AUC line on the overview chart visibly stays within ~0.01 of its baseline while ECE roughly quadruples — i.e. the
+  headline narrative is visible at a glance.
+  - A4. "New merchant (<30d)" cohort row is highlighted in the cohorts table and visibly an outlier on the train-vs-OOT-AUC
+  scatter.
+  - A5. Bin-volume drift chart shows the training-edges strategy is the worst by Σ|bin% − 10%|, calibration-edges is best.
+  - A6. Isotonic-then-bin subplot shows visibly tighter per-bin trajectories than the raw-score subplot post-week-6.
+  - A7. Conditional PSI scatter shows several tactical features in the "mix change" zone (high marginal, low conditional) and
+  at least one in the "real shift" zone (high marginal, high conditional).
+  - A8. Adversarial-validation top-10 contains tactical and compositional features near the top, with session_keystroke_var
+  (invariant) clearly at the bottom.
+  - A9. Determinism: two reloads produce visually identical charts.
