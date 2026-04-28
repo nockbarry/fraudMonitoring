@@ -1,0 +1,2289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature Analysis Hub · fraud_v4.2</title>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<script id="payload">window.DATA = __DATA_JSON__;</script>
+<style>
+  :root {
+    --sb-bg: #0f172a;
+    --sb-bg-2: #1e293b;
+    --sb-fg: #cbd5e1;
+    --sb-dim: #64748b;
+    --accent: #6366f1;
+    --accent-bg: rgba(99,102,241,0.16);
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --border: #e4e7ec;
+    --text: #0f172a;
+    --dim: #64748b;
+    --good: #10b981;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    font-size: 14px;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ================= SIDEBAR ================= */
+  .sidebar {
+    width: 280px;
+    background: var(--sb-bg);
+    color: var(--sb-fg);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sb-head {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--sb-bg-2);
+  }
+  .sb-title { font-size: 15px; font-weight: 700; color: #f1f5f9; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .sb-title::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); display: inline-block; }
+  .sb-sub { font-size: 11px; color: var(--sb-dim); margin-top: 4px; letter-spacing: 0.4px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+  .sb-hublink {
+    display: block; font-size: 11px; color: var(--sb-dim);
+    padding: 8px 20px; text-decoration: none;
+    border-bottom: 1px solid var(--sb-bg-2);
+  }
+  .sb-hublink:hover { color: var(--accent); }
+  .sb-hublink .arrow { float: right; }
+  .sb-search { padding: 10px 14px; border-bottom: 1px solid var(--sb-bg-2); }
+  .sb-search input {
+    width: 100%; background: var(--sb-bg-2); border: 1px solid #334155;
+    color: #f1f5f9; padding: 7px 10px; border-radius: 5px; font-size: 12px; outline: none;
+  }
+  .sb-search input:focus { border-color: var(--accent); }
+  .sb-search input::placeholder { color: var(--sb-dim); }
+
+  .nav { flex: 1; overflow-y: auto; padding: 6px 0 10px; }
+  .nav::-webkit-scrollbar { width: 6px; }
+  .nav::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+  .nav-section { margin-bottom: 1px; }
+  .nav-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px 9px 18px; cursor: pointer; user-select: none;
+    font-size: 12.5px; font-weight: 600; color: #e2e8f0;
+    letter-spacing: 0.2px;
+  }
+  .nav-head:hover { background: rgba(255,255,255,0.04); }
+  .nav-head .chev {
+    margin-left: auto; color: var(--sb-dim); font-size: 9px;
+    transition: transform 0.15s; transform-origin: center;
+  }
+  .nav-section.collapsed .chev { transform: rotate(-90deg); }
+  .nav-section.collapsed .nav-items { display: none; }
+  .nav-items { padding: 2px 0 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 18px 6px 42px; cursor: pointer;
+    font-size: 12.5px; color: var(--sb-fg);
+    border-left: 2px solid transparent;
+    text-decoration: none;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.04); color: #f1f5f9; }
+  .nav-item.active {
+    color: #f1f5f9; background: var(--accent-bg);
+    border-left-color: var(--accent); font-weight: 500;
+  }
+  .nav-direct {
+    padding: 9px 18px; cursor: pointer;
+    font-size: 12.5px; color: #e2e8f0; font-weight: 600;
+    border-left: 2px solid transparent;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .nav-direct:hover { background: rgba(255,255,255,0.04); }
+  .nav-direct.active { background: var(--accent-bg); border-left-color: var(--accent); }
+  .nav-hide { display: none !important; }
+
+  .badge {
+    font-size: 10px; padding: 1px 7px; border-radius: 10px;
+    background: #334155; color: #cbd5e1; margin-left: auto;
+    font-weight: 500; letter-spacing: 0.2px;
+  }
+  .badge-warn { background: #78350f; color: #fcd34d; }
+  .badge-bad { background: #7f1d1d; color: #fca5a5; }
+
+  .sb-foot {
+    padding: 12px 18px; border-top: 1px solid var(--sb-bg-2);
+    font-size: 11px; color: var(--sb-dim);
+  }
+
+  /* ================= CONTENT ================= */
+  .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .topbar {
+    height: 56px; background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 24px; gap: 16px;
+    flex-shrink: 0;
+  }
+  .crumbs { font-size: 13px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+  .crumbs strong { color: var(--text); font-weight: 600; }
+  .crumbs .sep { color: #cbd5e1; }
+  .tr { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--dim); }
+  .tstat { display: flex; gap: 5px; align-items: center; }
+  .tstat strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .main { flex: 1; overflow-y: auto; padding: 22px 24px; }
+  .main::-webkit-scrollbar { width: 8px; }
+  .main::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+  .page-h { margin-bottom: 18px; }
+  .page-t { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+  .page-d { font-size: 13px; color: var(--dim); margin: 0; max-width: 820px; line-height: 1.5; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+
+  .controls {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 14px; padding: 10px 14px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .ctl { display: flex; align-items: center; gap: 8px; }
+  .ctl label {
+    font-size: 11px; font-weight: 600; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .ctl select, .ctl input[type=text] {
+    font-size: 13px; padding: 5px 28px 5px 10px;
+    border: 1px solid var(--border); border-radius: 5px;
+    background: white; outline: none; cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  .ctl select:focus { border-color: var(--accent); }
+  .ctl button {
+    font-size: 12px; padding: 5px 10px;
+    border: 1px solid var(--border); border-radius: 5px;
+    background: white; cursor: pointer; color: var(--text);
+  }
+  .ctl button:hover { background: #f1f5f9; }
+  .ctl button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 13px 16px; }
+  .kpi-l { font-size: 11px; color: var(--dim); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px; }
+  .kpi-v { font-size: 22px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .kpi-s { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+  .kpi-accent { border-left: 3px solid var(--accent); }
+  .kpi-warn { border-left: 3px solid var(--warn); }
+  .kpi-bad { border-left: 3px solid var(--bad); }
+
+  .chart-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; margin-bottom: 14px; }
+  .chart-head { padding: 10px 14px 2px; }
+  .chart-t { font-size: 13.5px; font-weight: 600; margin: 0; }
+  .chart-s { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .chart-body { padding: 4px; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 1000px) { .row2 { grid-template-columns: 1fr; } }
+
+  .ftbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ftbl th {
+    text-align: left; font-size: 11px; text-transform: uppercase;
+    color: var(--dim); font-weight: 600;
+    padding: 10px 12px; border-bottom: 1px solid var(--border); letter-spacing: 0.4px;
+  }
+  .ftbl td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
+  .ftbl tr { cursor: pointer; }
+  .ftbl tr:hover td { background: #f8fafc; }
+  .bar-mini {
+    display: inline-block; height: 6px; background: var(--accent);
+    border-radius: 3px; vertical-align: middle;
+  }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .pill-good { background: #d1fae5; color: #065f46; }
+  .pill-warn { background: #fef3c7; color: #92400e; }
+  .pill-bad { background: #fee2e2; color: #991b1b; }
+
+  .alert {
+    display: flex; gap: 10px; padding: 10px 12px;
+    border-left: 3px solid var(--warn); background: #fffbeb;
+    border-radius: 4px; margin-bottom: 6px; font-size: 13px;
+  }
+  .alert.bad { border-left-color: var(--bad); background: #fef2f2; }
+  .alert strong { margin-right: 4px; }
+  .alert code { background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  .sec-title { font-size: 13px; font-weight: 600; margin: 4px 0 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--dim); }
+
+  .link-like {
+    color: var(--accent); cursor: pointer; text-decoration: none;
+    border-bottom: 1px dashed transparent;
+  }
+  .link-like:hover { border-bottom-color: var(--accent); }
+
+  @media (max-width: 720px) {
+    .sidebar { width: 240px; }
+    .tr { display: none; }
+  }
+
+  /* Feature focus page */
+  .ff-hero {
+    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 60%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .ff-hero-main { flex: 1; min-width: 260px; }
+  .ff-hero-name { font-size: 26px; font-weight: 700; margin: 0; font-family: 'SF Mono', Menlo, Consolas, monospace; letter-spacing: -0.5px; }
+  .ff-hero-meta { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--dim); }
+  .ff-hero-meta .pill { margin-right: 2px; }
+  .ff-hero-nav { display: flex; gap: 6px; align-items: center; }
+  .ff-hero-nav button {
+    font-size: 12px; padding: 6px 12px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: white; cursor: pointer; color: var(--text);
+  }
+  .ff-hero-nav button:hover:not(:disabled) { background: #f1f5f9; border-color: var(--accent); color: var(--accent); }
+  .ff-hero-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ff-hero-nav .ff-counter { font-size: 11px; color: var(--dim); margin: 0 6px; font-variant-numeric: tabular-nums; }
+
+  .ff-timeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 1100px) { .ff-timeline { grid-template-columns: repeat(2, 1fr); } }
+  .ff-mini {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px 4px;
+  }
+  .ff-mini-t { font-size: 11px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; }
+  .ff-mini-v { font-size: 16px; font-weight: 700; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .ff-mini-v.delta-bad { color: var(--bad); }
+  .ff-mini-v.delta-warn { color: var(--warn); }
+  .ff-mini-v.delta-good { color: var(--good); }
+  .ff-mini-s { font-size: 10.5px; color: var(--dim); }
+
+  .ff-section-hd {
+    font-size: 12px; font-weight: 700; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin: 18px 0 8px; padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+  .ff-section-hd:first-of-type { border-top: 0; padding-top: 0; margin-top: 6px; }
+
+  /* Feature list in sidebar - sparklines */
+  .nav-items-feat .nav-item {
+    padding: 5px 12px 5px 30px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11.5px;
+  }
+  .nav-items-feat .nav-item span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .nav-spark { opacity: 0.85; flex-shrink: 0; }
+  .nav-dot {
+    width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+    background: #475569;
+  }
+  .nav-dot.warn { background: var(--warn); }
+  .nav-dot.bad  { background: var(--bad); }
+  .nav-dot.good { background: var(--good); }
+
+  .ff-jump-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--accent);
+    text-decoration: none; padding: 4px 10px;
+    border: 1px solid var(--accent); border-radius: 14px;
+    background: white; cursor: pointer;
+    margin-left: auto;
+  }
+  .ff-jump-link:hover { background: var(--accent); color: white; }
+
+  /* clickable feature code pills */
+  .fcode {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    color: var(--accent);
+    cursor: pointer;
+    border-bottom: 1px dashed transparent;
+  }
+  .fcode:hover { border-bottom-color: var(--accent); }
+
+  /* Compare mode */
+  .ff-compare-bar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    background: white; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 14px;
+  }
+  .ff-compare-bar label {
+    font-size: 11px; font-weight: 600; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .ff-compare-bar select {
+    font-size: 13px; padding: 5px 28px 5px 10px;
+    border: 1px solid var(--border); border-radius: 5px;
+    background: white; outline: none; cursor: pointer;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  .ff-compare-bar button {
+    font-size: 12px; padding: 5px 12px;
+    border: 1px solid var(--border); border-radius: 5px;
+    background: white; cursor: pointer; color: var(--text);
+  }
+  .ff-compare-bar button:hover { background: #f1f5f9; border-color: var(--accent); color: var(--accent); }
+  .ff-compare-bar .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .ff-compare-bar .btn-primary:hover { background: #4f46e5; }
+  .ff-compare-bar .btn-danger:hover { background: #fef2f2; border-color: var(--bad); color: var(--bad); }
+
+  .ff-hero-compare .ff-hero-name {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    font-size: 22px; line-height: 1.25;
+  }
+  .ff-hero-compare .ff-hero-name > span { display: inline-block; }
+  .ff-vs {
+    display: inline-flex; align-items: center;
+    color: #6366f1; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    background: #e0e7ff; padding: 3px 10px; border-radius: 12px;
+    font-family: -apple-system, Segoe UI, sans-serif;
+  }
+  .ff-side-tag {
+    font-size: 10px; font-weight: 700;
+    color: white; padding: 2px 6px; border-radius: 3px;
+    margin-right: 6px; letter-spacing: 0.5px;
+    vertical-align: middle;
+  }
+  .ff-side-a { background: #6366f1; }
+  .ff-side-b { background: #ef4444; }
+  .ff-side-c { background: #10b981; }
+  .ff-side-d { background: #f59e0b; }
+  .ff-side-e { background: #8b5cf6; }
+
+  .cmp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f1f5f9;
+    padding: 3px 4px 3px 8px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .cmp-chip.chip-anchor {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+  }
+  .cmp-chip select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 2px 6px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+    border-radius: 4px;
+  }
+  .cmp-chip select:hover,
+  .cmp-chip select:focus {
+    border-color: var(--accent);
+    background: white;
+  }
+  .cmp-chip .chip-name-static {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    padding: 2px 6px;
+  }
+  .chip-remove {
+    background: transparent;
+    border: none;
+    color: var(--dim);
+    cursor: pointer;
+    padding: 0 5px 0 3px;
+    font-size: 15px;
+    line-height: 1;
+    font-weight: bold;
+    border-radius: 50%;
+  }
+  .chip-remove:hover { color: var(--bad); background: #fee2e2; }
+
+  .compare-grid-n {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .mini-legend {
+    font-size: 10px; color: var(--dim);
+    margin-top: 2px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .mini-legend-swatch {
+    display: inline-block;
+    width: 8px; height: 2px;
+    vertical-align: middle; margin-right: 3px;
+  }
+
+  .compare-tbl .best-cell { background: #f0fdf4; font-weight: 600; color: #166534; }
+  .compare-tbl .worst-cell { background: #fef2f2; color: #991b1b; }
+
+  .compare-tbl {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    background: white; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .compare-tbl th {
+    text-align: left; font-size: 11px;
+    text-transform: uppercase; color: var(--dim); font-weight: 600;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    letter-spacing: 0.4px; background: #f8fafc;
+  }
+  .compare-tbl th:first-child { width: 28%; }
+  .compare-tbl td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
+  .compare-tbl tr:last-child td { border-bottom: 0; }
+  .compare-tbl .metric-name { color: var(--text); font-weight: 500; }
+  .compare-tbl .delta-bad { color: var(--bad); font-weight: 600; }
+  .compare-tbl .delta-good { color: var(--good); font-weight: 600; }
+  .compare-tbl .delta-warn { color: var(--warn); font-weight: 600; }
+
+  .compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 1100px) { .compare-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-head">
+    <div class="sb-title">Feature Analysis</div>
+    <div class="sb-sub">fraud_v4.2 · run 2025-10-14</div>
+  </div>
+  <a class="sb-hublink" href="./model_performance_hub_real.html">Model Performance Hub <span class="arrow">→</span></a>
+  <a class="sb-hublink" href="./stability_monitoring_hub_real.html">Stability &amp; Calibration Hub <span class="arrow">→</span></a>
+  <div class="sb-search">
+    <input type="text" id="search" placeholder="Search features or sections…" autocomplete="off">
+  </div>
+  <nav class="nav" id="nav"></nav>
+  <div class="sb-foot" id="sb-foot"></div>
+</aside>
+
+<div class="content">
+  <div class="topbar">
+    <div class="crumbs" id="crumbs"></div>
+    <div class="tr">
+      <div class="tstat">Train AUC <strong>0.932</strong></div>
+      <div class="tstat">Val AUC <strong>0.921</strong></div>
+      <div class="tstat">OOT AUC <strong>0.874</strong></div>
+    </div>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+/* =========================================================================
+   SEEDED RNG + HELPERS
+   ========================================================================= */
+function mulberry32(s) { return function() {
+  s = (s + 0x6D2B79F5) | 0;
+  let t = Math.imul(s ^ (s >>> 15), 1 | s);
+  t = t + Math.imul(t ^ (t >>> 7), 61 | t) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};}
+const rng = mulberry32(7);
+function randn() {
+  const u1 = Math.max(rng(), 1e-10), u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+const clip = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const sig = x => 1 / (1 + Math.exp(-x));
+
+/* =========================================================================
+   TIME GRID + FEATURES
+   ========================================================================= */
+const N_DAYS = window.DATA.n_days;
+const OOT_DAY = window.DATA.oot_day;
+const START = new Date(window.DATA.start_date + 'T00:00:00Z');
+const DATES = Array.from({length: N_DAYS}, (_, i) =>
+  new Date(START.getTime() + i * 86400000).toISOString().slice(0, 10));
+const N_WEEKS = Math.ceil(N_DAYS / 7);
+const OOT_WEEK = Math.floor(OOT_DAY / 7);
+const WEEKS = Array.from({length: N_WEEKS}, (_, i) => `W${String(i+1).padStart(2,'0')}`);
+
+// Feature list: comes from window.DATA.features
+const FEATURES = window.DATA.features.length ? window.DATA.features : [
+  { n: 'amt_log',            t: 'num', imp: 0.185, auc: 0.78, drift: 0.02, miss: 0.01 },
+  { n: 'velocity_24h',       t: 'num', imp: 0.152, auc: 0.76, drift: 0.03, miss: 0.00 },
+  { n: 'velocity_7d',        t: 'num', imp: 0.121, auc: 0.74, drift: 0.02, miss: 0.00 },
+  { n: 'ip_risk_score',      t: 'num', imp: 0.110, auc: 0.73, drift: 0.04, miss: 0.08 },
+  { n: 'device_age_days',    t: 'num', imp: 0.088, auc: 0.71, drift: 0.05, miss: 0.12 },
+  { n: 'email_domain_risk',  t: 'num', imp: 0.072, auc: 0.69, drift: 0.16, miss: 0.06 },  // DRIFT
+  { n: 'merchant_risk',      t: 'num', imp: 0.065, auc: 0.68, drift: 0.06, miss: 0.02 },
+  { n: 'card_tenure',        t: 'num', imp: 0.054, auc: 0.66, drift: 0.03, miss: 0.01 },
+  { n: 'num_declines_7d',    t: 'num', imp: 0.048, auc: 0.65, drift: 0.04, miss: 0.00 },
+  { n: 'avg_ticket_90d',     t: 'num', imp: 0.040, auc: 0.63, drift: 0.04, miss: 0.03 },
+  { n: 'session_entropy',    t: 'num', imp: 0.031, auc: 0.61, drift: 0.05, miss: 0.04 },
+  { n: 'address_change_30d', t: 'num', imp: 0.022, auc: 0.59, drift: 0.19, miss: 0.01 },  // DRIFT
+  { n: 'ua_rarity',          t: 'num', imp: 0.018, auc: 0.58, drift: 0.10, miss: 0.24 },  // MISSING
+  { n: 'phone_carrier_risk', t: 'num', imp: 0.015, auc: 0.57, drift: 0.05, miss: 0.08 },
+  { n: 'bin_country',        t: 'cat', imp: 0.042, auc: 0.64, drift: 0.09, miss: 0.01,
+    cats: ['US','GB','CA','DE','FR','IN','BR','NG','OTHER'] },
+  { n: 'channel',            t: 'cat', imp: 0.028, auc: 0.60, drift: 0.04, miss: 0.00,
+    cats: ['web','ios','android','api','pos'] },
+  { n: 'merchant_category',  t: 'cat', imp: 0.035, auc: 0.62, drift: 0.05, miss: 0.00,
+    cats: ['retail','digital','travel','food','services','gaming','crypto','OTHER'] },
+  { n: '3ds_outcome',        t: 'cat', imp: 0.025, auc: 0.60, drift: 0.07, miss: 0.17,
+    cats: ['pass','fail','frictionless','challenge','bypass'] },
+];
+const FMAP = Object.fromEntries(FEATURES.map(f => [f.n, f]));
+const NUM_FEATURES = FEATURES.filter(f => f.t === 'num').map(f => f.n);
+const CAT_FEATURES = FEATURES.filter(f => f.t === 'cat').map(f => f.n);
+const FEATURES_SORTED = [...FEATURES].sort((a, b) => b.imp - a.imp);
+
+// Sticky feature state — last feature the user picked in any per-feature view
+let lastSelectedFeature = FEATURES_SORTED[0].n;
+function setLastFeature(name) { if (FMAP[name]) lastSelectedFeature = name; }
+function resolveFeature(params, filter = () => true) {
+  if (params.f && FMAP[params.f] && filter(FMAP[params.f])) return params.f;
+  if (FMAP[lastSelectedFeature] && filter(FMAP[lastSelectedFeature])) return lastSelectedFeature;
+  return FEATURES.filter(filter)[0].n;
+}
+
+// Tiny SVG sparkline for the sidebar
+function sparklineSVG(values, opts = {}) {
+  const w = opts.width || 48, h = opts.height || 14;
+  const min = opts.min != null ? opts.min : Math.min(...values);
+  const max = opts.max != null ? opts.max : Math.max(...values);
+  const range = Math.max(max - min, 1e-6);
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * (w - 2) + 1;
+    const y = h - 1 - ((v - min) / range) * (h - 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg class="nav-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <polyline points="${pts}" fill="none" stroke="${opts.color || '#94a3b8'}" stroke-width="1.2" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function featureHealth(f) {
+  if (f.drift > 0.1) return 'bad';
+  if (f.miss > 0.15) return 'warn';
+  return 'good';
+}
+
+/* =========================================================================
+   PRE-COMPUTE DATA
+   ========================================================================= */
+const weeklyAUC = {}, dailyAUC = {}, weeklyMiss = {}, dailyMiss = {};
+const weeklyPerm = {}, dailyPerm = {};
+const anomZ = {}, anomMean = {};
+const behavior = {}, pdp = {};
+const catShares = {};
+const spreads = {};
+
+FEATURES.forEach(f => {
+  // Weekly AUC + missing
+  const wa = [], wm = [], wp = [];
+  for (let w = 0; w < N_WEEKS; w++) {
+    const postOOT = w >= OOT_WEEK ? 1 : 0;
+    const aucDrift = postOOT * f.drift * (1 + (w - OOT_WEEK) * 0.12) + randn() * 0.012;
+    wa.push(clip(f.auc - aucDrift, 0.45, 0.92));
+    const missShift = postOOT * 0.022 + randn() * 0.02;
+    wm.push(clip(f.miss + missShift, 0, 1));
+    // permutation ~= (AUC - 0.5) scaled by importance, with weekly noise
+    const permDrop = f.imp * 0.8 * clip(f.auc - 0.5, 0, 1) + randn() * 0.003 - postOOT * f.drift * 0.2;
+    wp.push(clip(permDrop, 0, 0.06));
+  }
+  weeklyAUC[f.n] = wa; weeklyMiss[f.n] = wm; weeklyPerm[f.n] = wp;
+
+  // Daily AUC + missing + permutation
+  const da = [], dm = [], dp = [];
+  for (let d = 0; d < N_DAYS; d++) {
+    const postOOT = d >= OOT_DAY ? 1 : 0;
+    const aucDrift = postOOT * f.drift * (1 + (d - OOT_DAY) / 50) + randn() * 0.025;
+    da.push(clip(f.auc - aucDrift, 0.45, 0.93));
+    const missShift = postOOT * 0.03 + randn() * 0.028;
+    dm.push(clip(f.miss + missShift, 0, 1));
+    const permDrop = f.imp * 0.8 * clip(f.auc - 0.5, 0, 1) + randn() * 0.005 - postOOT * f.drift * 0.25;
+    dp.push(clip(permDrop, 0, 0.07));
+  }
+  dailyAUC[f.n] = da; dailyMiss[f.n] = dm; dailyPerm[f.n] = dp;
+
+  // Anomalies: robust z of daily median (amplified for drifty features)
+  const zs = [], ms = [];
+  for (let d = 0; d < N_DAYS; d++) {
+    const postOOT = d >= OOT_DAY ? 1 : 0;
+    const baseZ = randn() * 0.9 + postOOT * f.drift * 14;
+    const spike = (Math.abs(randn()) > 2.2 && d > 40) ? (randn() > 0 ? 4 : -3.5) * f.drift * 8 : 0;
+    zs.push(baseZ + spike);
+    ms.push(randn() * 0.8 + postOOT * f.drift * 10 + (d > 60 && d < 80 ? Math.sin((d-60)/5) * 2 : 0));
+  }
+  anomZ[f.n] = zs; anomMean[f.n] = ms;
+
+  // Spreads per numeric feature
+  if (f.t === 'num') {
+    const q1 = [], q3 = [], mean = [], vmin = [], vmax = [];
+    for (let d = 0; d < N_DAYS; d++) {
+      const postOOT = d >= OOT_DAY ? 1 : 0;
+      const shift = postOOT * f.drift * 3;
+      const m = 50 + shift + randn() * 2 + Math.sin(d / 12) * 3;
+      const spread = 15 + postOOT * f.drift * 8;
+      mean.push(m);
+      q1.push(m - spread * 0.7);
+      q3.push(m + spread * 0.7);
+      vmin.push(m - spread * 2.2 - Math.abs(randn()) * 2);
+      vmax.push(m + spread * 2.2 + Math.abs(randn()) * 2);
+    }
+    spreads[f.n] = { q1, q3, mean, min: vmin, max: vmax };
+  }
+
+  // Behavior: 10 buckets, count + fraud_rate + mean_score (numeric)
+  if (f.t === 'num') {
+    const buckets = Array.from({length: 10}, (_, i) => `Q${i+1}`);
+    const count = [], fraudRate = [], meanScore = [];
+    for (let i = 0; i < 10; i++) {
+      count.push(Math.round(800 + rng() * 600));
+      // Monotonic relationship + noise, based on feature's AUC strength
+      const strength = (f.auc - 0.5) * 2;
+      const fr = sig(-3 + strength * (i / 9) * 4 + randn() * 0.3);
+      fraudRate.push(fr);
+      meanScore.push(clip(fr * 0.7 + 0.05 + randn() * 0.03, 0.01, 0.99));
+    }
+    behavior[f.n] = { buckets, count, fraudRate, meanScore };
+  } else {
+    // Behavior for categorical
+    const cts = f.cats;
+    const count = cts.map((_, i) => Math.round(500 + rng() * 1200 * (1 / (i + 1))));
+    const fraudRate = cts.map(c => {
+      let base = 0.01;
+      if (c === 'NG' || c === 'crypto' || c === 'gaming' || c === 'fail') base = 0.08 + rng() * 0.04;
+      else if (c === 'bypass' || c === 'api') base = 0.04 + rng() * 0.02;
+      return base + randn() * 0.005;
+    });
+    const meanScore = fraudRate.map(fr => clip(fr * 0.8 + 0.04 + randn() * 0.02, 0.01, 0.99));
+    behavior[f.n] = { buckets: cts, count, fraudRate, meanScore };
+  }
+
+  // PDP (numeric only)
+  if (f.t === 'num') {
+    const n = 25;
+    const xs = Array.from({length: n}, (_, i) => i / (n - 1));
+    const strength = (f.auc - 0.5) * 2;
+    const ys = xs.map(x => sig(-2.5 + strength * x * 4 + Math.sin(x * 6) * 0.3 * strength));
+    pdp[f.n] = { xs, ys, baseline: ys.reduce((a, b) => a + b, 0) / ys.length };
+  }
+
+  // Categorical daily shares (for cat features)
+  if (f.t === 'cat') {
+    const cats = f.cats;
+    const shares = cats.map(() => []);
+    for (let d = 0; d < N_DAYS; d++) {
+      const postOOT = d >= OOT_DAY ? 1 : 0;
+      const raw = cats.map((_, i) => {
+        const base = Math.exp(-i * 0.5);
+        const shift = (i === cats.length - 1 ? postOOT * f.drift * 4 : 0)  // last cat grows in OOT
+                    + (i === 0 ? -postOOT * f.drift * 2 : 0);
+        return Math.max(0.01, base + shift + randn() * 0.08);
+      });
+      const s = raw.reduce((a, b) => a + b, 0);
+      raw.forEach((v, i) => shares[i].push(v / s));
+    }
+    catShares[f.n] = shares;
+  }
+});
+
+// Bivariate: generate 5x5 fraud-rate heatmap for any selected pair
+function bivariateFR(f1, f2) {
+  // Deterministic hash seed from names for stability
+  let seed = 0; for (const c of (f1 + '|' + f2)) seed = (seed * 31 + c.charCodeAt(0)) | 0;
+  const r = mulberry32(Math.abs(seed) || 1);
+  const rn = () => { const u1 = Math.max(r(), 1e-10), u2 = r(); return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2); };
+  const alpha = -3.2 + rn() * 0.3;
+  const b1 = 1.4 + rn() * 0.4, b2 = 1.1 + rn() * 0.4, binter = 0.6 * rn();
+  const z = [], cnt = [];
+  for (let i = 0; i < 5; i++) {
+    const rowZ = [], rowC = [];
+    for (let j = 0; j < 5; j++) {
+      const x1 = i / 4, x2 = j / 4;
+      const p = sig(alpha + b1 * x1 + b2 * x2 + binter * x1 * x2 + rn() * 0.2);
+      rowZ.push(p);
+      rowC.push(Math.round(200 + r() * 800));
+    }
+    z.push(rowZ); cnt.push(rowC);
+  }
+  return { z, cnt };
+}
+
+// Clustering data
+function buildClusterData() {
+  const ks = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const silhouette = {
+    train: ks.map(k => 0.55 - Math.abs(k - 4) * 0.04 + randn() * 0.015),
+    val:   ks.map(k => 0.52 - Math.abs(k - 4) * 0.045 + randn() * 0.02),
+    oot:   ks.map(k => 0.41 - Math.abs(k - 4) * 0.05 + randn() * 0.025),
+  };
+  // PCA scatter: 4 methods, 400 points each
+  const nPoints = 400;
+  const methods = ['KMeans', 'Ward', 'GMM', 'DBSCAN'];
+  const scatters = {};
+  methods.forEach(m => {
+    const x = [], y = [], lbl = [];
+    const nc = m === 'DBSCAN' ? 5 : 4;
+    for (let i = 0; i < nPoints; i++) {
+      let c;
+      if (m === 'DBSCAN' && rng() < 0.08) c = -1;
+      else c = Math.floor(rng() * nc);
+      const cx = c === -1 ? 0 : Math.cos(c * 2 * Math.PI / nc) * 2.3;
+      const cy = c === -1 ? 0 : Math.sin(c * 2 * Math.PI / nc) * 2.3;
+      x.push(cx + randn() * 0.7);
+      y.push(cy + randn() * 0.7);
+      lbl.push(c);
+    }
+    scatters[m] = { x, y, lbl };
+  });
+  // Cluster profile: 4 clusters × top 10 features
+  const topFeats = FEATURES.slice(0, 10).map(f => f.n);
+  const profile = [];
+  for (let c = 0; c < 4; c++) {
+    const row = topFeats.map(() => randn() * 1.3);
+    profile.push(row);
+  }
+  // Weekly cluster mix (last OOT weeks)
+  const ootWeeks = Array.from({length: N_WEEKS - OOT_WEEK}, (_, i) => `W${String(OOT_WEEK + i + 1).padStart(2,'0')}`);
+  const mixRaw = Array.from({length: 4}, () => []);
+  for (let w = 0; w < ootWeeks.length; w++) {
+    const vals = [2 + randn() * 0.4, 1.5 + w * 0.1 + randn() * 0.3, 1 + randn() * 0.3, 1.2 - w * 0.05 + randn() * 0.3];
+    const s = vals.reduce((a, b) => a + Math.max(0.05, b), 0);
+    vals.forEach((v, i) => mixRaw[i].push(Math.max(0.05, v) / s));
+  }
+  // L1 drift week-to-week
+  const drift = [];
+  for (let w = 1; w < ootWeeks.length; w++) {
+    let d = 0;
+    for (let c = 0; c < 4; c++) d += Math.abs(mixRaw[c][w] - mixRaw[c][w-1]);
+    drift.push(d);
+  }
+  return { ks, silhouette, scatters, profile, topFeats, ootWeeks, mix: mixRaw, drift };
+}
+const CLUSTERS = buildClusterData();
+
+/* =========================================================================
+   NAV TREE + ROUTER
+   ========================================================================= */
+const NAV = [
+  { id: 'overview', title: 'Overview', kind: 'direct' },
+  { id: 'time-drift', title: 'Time drift', children: [
+    { id: 'auc',     title: 'AUC over time' },
+    { id: 'missing', title: 'Missing rate' },
+  ]},
+  { id: 'behavior',  title: 'Behavior',            kind: 'direct', badge: '18' },
+  { id: 'pdp',       title: 'Partial dependence',  kind: 'direct', badge: '14' },
+  { id: 'bivariate', title: 'Bivariate fraud rate', kind: 'direct' },
+  { id: 'anomalies', title: 'Anomalies', badge: '3 flagged', badgeKind: 'warn', children: [
+    { id: 'robust-z',    title: 'Robust z-score' },
+    { id: 'mean-drift',  title: 'Mean drift' },
+    { id: 'spreads',     title: 'Distribution spreads' },
+  ]},
+  { id: 'categorical', title: 'Categorical stability', kind: 'direct', badge: '4' },
+  { id: 'permutation', title: 'Permutation importance', children: [
+    { id: 'weekly', title: 'Weekly' },
+    { id: 'daily',  title: 'Daily' },
+  ]},
+  { id: 'clustering', title: 'Clustering', children: [
+    { id: 'methods',  title: 'Methods comparison' },
+    { id: 'profiles', title: 'Profiles & time mix' },
+  ]},
+  { id: 'features', title: 'Features', collapsedByDefault: true,
+    badge: `${FEATURES.length}`,
+    childrenKind: 'feat',
+    children: FEATURES_SORTED.map(f => {
+      const h = featureHealth(f);
+      return {
+        id: f.n,
+        title: f.n,
+        path: `feature/${f.n}`,
+        sparklineFor: f.n,
+        dot: h,
+      };
+    })
+  },
+];
+
+const navEl = document.getElementById('nav');
+const mainEl = document.getElementById('main');
+const crumbsEl = document.getElementById('crumbs');
+const footEl = document.getElementById('sb-foot');
+const searchEl = document.getElementById('search');
+
+const collapsedSections = new Set(['features']);
+
+function renderNav(filter = '') {
+  navEl.innerHTML = '';
+  const q = filter.trim().toLowerCase();
+  NAV.forEach(sec => {
+    if (sec.kind === 'direct') {
+      if (q && !sec.title.toLowerCase().includes(q)) return;
+      const el = document.createElement('div');
+      el.className = 'nav-direct';
+      el.dataset.path = sec.id;
+      el.innerHTML = `<span>${sec.title}</span>${sec.badge ? `<span class="badge ${sec.badgeKind ? 'badge-' + sec.badgeKind : ''}">${sec.badge}</span>` : ''}`;
+      el.onclick = () => navigate(sec.id);
+      navEl.appendChild(el);
+    } else {
+      const sectionEl = document.createElement('div');
+      sectionEl.className = 'nav-section';
+      if (collapsedSections.has(sec.id)) sectionEl.classList.add('collapsed');
+      const head = document.createElement('div');
+      head.className = 'nav-head';
+      head.innerHTML = `<span>${sec.title}</span>${sec.badge ? `<span class="badge ${sec.badgeKind ? 'badge-' + sec.badgeKind : ''}">${sec.badge}</span>` : ''}<span class="chev">▼</span>`;
+      head.onclick = () => {
+        if (collapsedSections.has(sec.id)) collapsedSections.delete(sec.id);
+        else collapsedSections.add(sec.id);
+        sectionEl.classList.toggle('collapsed');
+      };
+      sectionEl.appendChild(head);
+      const items = document.createElement('div');
+      items.className = sec.childrenKind === 'feat' ? 'nav-items nav-items-feat' : 'nav-items';
+      let hasMatch = false;
+      sec.children.forEach(sub => {
+        if (q && !sub.title.toLowerCase().includes(q) && !sec.title.toLowerCase().includes(q)) return;
+        hasMatch = true;
+        const item = document.createElement('div');
+        item.className = 'nav-item';
+        const path = sub.path || `${sec.id}/${sub.id}`;
+        item.dataset.path = path;
+        if (sub.sparklineFor) {
+          const spark = sparklineSVG(weeklyAUC[sub.sparklineFor], {
+            width: 42, height: 12, min: 0.45, max: 0.85,
+            color: sub.dot === 'bad' ? '#ef4444' : sub.dot === 'warn' ? '#f59e0b' : '#94a3b8'
+          });
+          item.innerHTML = `<span>${sub.title}</span>${spark}<span class="nav-dot ${sub.dot || ''}"></span>`;
+        } else {
+          item.innerHTML = `<span>${sub.title}</span>${sub.badge ? `<span class="badge ${sub.badgeKind ? 'badge-' + sub.badgeKind : ''}">${sub.badge}</span>` : ''}`;
+        }
+        item.onclick = () => navigate(path);
+        items.appendChild(item);
+      });
+      sectionEl.appendChild(items);
+      if (q && !hasMatch && !sec.title.toLowerCase().includes(q)) return;
+      if (q) sectionEl.classList.remove('collapsed');  // auto-expand on search
+      navEl.appendChild(sectionEl);
+    }
+  });
+  updateActive();
+}
+
+function updateActive() {
+  document.querySelectorAll('.nav-item, .nav-direct').forEach(el => {
+    el.classList.toggle('active', el.dataset.path === currentPath);
+  });
+}
+
+function renderCrumbs() {
+  const parts = currentPath.split('/');
+  let crumbs = [`<strong>Feature Hub</strong>`];
+  if (parts[0] === 'feature' && parts[1]) {
+    crumbs.push(`<span class="sep">›</span>`);
+    crumbs.push(`<span>Features</span>`);
+    crumbs.push(`<span class="sep">›</span>`);
+    crumbs.push(`<strong style="font-family:'SF Mono',Menlo,Consolas,monospace">${parts[1]}</strong>`);
+  } else if (parts[0]) {
+    const sec = NAV.find(s => s.id === parts[0]);
+    crumbs.push(`<span class="sep">›</span>`);
+    crumbs.push(parts[1] ? `<span>${sec?.title || parts[0]}</span>` : `<strong>${sec?.title || parts[0]}</strong>`);
+    if (parts[1]) {
+      const sub = sec?.children?.find(c => c.id === parts[1]);
+      crumbs.push(`<span class="sep">›</span>`);
+      crumbs.push(`<strong>${sub?.title || parts[1]}</strong>`);
+    }
+  }
+  crumbsEl.innerHTML = crumbs.join(' ');
+}
+
+function updateFooter() {
+  const driftCount = FEATURES.filter(f => f.drift > 0.1).length;
+  const missCount  = FEATURES.filter(f => f.miss > 0.15).length;
+  footEl.innerHTML = `${FEATURES.length} features · ${N_DAYS} days<br>${driftCount} drift flag · ${missCount} missing flag`;
+}
+
+let currentPath = '';
+let currentFeature = null;
+let currentPair = null;
+
+function navigate(path, params = {}) {
+  // Clean up any existing Plotly charts
+  mainEl.querySelectorAll('[id^="plot-"], [id^="ff-plot-"]').forEach(el => { try { Plotly.purge(el); } catch (e) {} });
+  currentPath = path;
+  const qs = new URLSearchParams(params).toString();
+  location.hash = '#/' + path + (qs ? '?' + qs : '');
+  renderCrumbs();
+  updateActive();
+  render(params);
+}
+
+window.addEventListener('hashchange', () => {
+  const h = location.hash.replace(/^#\/?/, '');
+  const [p, qs] = h.split('?');
+  const params = Object.fromEntries(new URLSearchParams(qs || ''));
+  if (p !== currentPath) {
+    currentPath = p || 'overview';
+    renderCrumbs(); updateActive(); render(params);
+  }
+});
+
+function render(params = {}) {
+  const parts = currentPath.split('/');
+  // Feature focus page: feature/<name>
+  if (parts[0] === 'feature' && parts[1]) {
+    mainEl.innerHTML = '';
+    renderFeatureFocus(parts[1], params);
+    return;
+  }
+  const fn = ROUTES[currentPath] || ROUTES[parts[0]] || ROUTES['overview'];
+  mainEl.innerHTML = '';
+  fn(params);
+}
+
+/* =========================================================================
+   COMMON LAYOUT / PLOT HELPERS
+   ========================================================================= */
+function el(tag, cls, html) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  return e;
+}
+
+function pageHeader(title, desc) {
+  const h = el('div', 'page-h');
+  h.innerHTML = `<h1 class="page-t">${title}</h1>${desc ? `<p class="page-d">${desc}</p>` : ''}`;
+  return h;
+}
+
+function chartCard(title, sub, id, height) {
+  const wrap = el('div', 'chart-wrap');
+  const head = el('div', 'chart-head');
+  head.innerHTML = `<div class="chart-t">${title}</div>${sub ? `<div class="chart-s">${sub}</div>` : ''}`;
+  const body = el('div', 'chart-body');
+  const plot = el('div'); plot.id = id; plot.style.height = (height || 380) + 'px';
+  body.appendChild(plot);
+  wrap.appendChild(head); wrap.appendChild(body);
+  return { wrap, plot };
+}
+
+function ootLineShape(xVal, yMaxRef = 'paper') {
+  return {
+    type: 'line', xref: 'x', yref: yMaxRef,
+    x0: xVal, x1: xVal, y0: 0, y1: 1,
+    line: { color: '#ef4444', width: 1.4, dash: 'dash' }
+  };
+}
+function ootAnnotation(xVal, label = 'OOT start') {
+  return {
+    xref: 'x', yref: 'paper', x: xVal, y: 1.02,
+    text: label, showarrow: false,
+    font: { color: '#ef4444', size: 10 }, xanchor: 'left'
+  };
+}
+
+const COMMON_FONT = { family: 'Inter, -apple-system, Segoe UI, Roboto, sans-serif', size: 11, color: '#334155' };
+const COMMON_CFG = { responsive: true, displayModeBar: false };
+
+function baseLayout(extra = {}) {
+  return Object.assign({
+    margin: { t: 24, r: 20, b: 46, l: 70 },
+    font: COMMON_FONT,
+    paper_bgcolor: 'white',
+    plot_bgcolor: 'white',
+  }, extra);
+}
+
+/* =========================================================================
+   ROUTES / RENDERERS
+   ========================================================================= */
+const ROUTES = {};
+
+// ------- OVERVIEW -------
+ROUTES['overview'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Overview',
+    'Top-level health check of the feature set. Drill into the left nav for deep dives on drift, behavior, partial dependence, interactions, anomalies, importance, and clustering.'
+  ));
+
+  // KPIs
+  const medAUC = (arr => arr.sort((a,b)=>a-b)[Math.floor(arr.length/2)])(FEATURES.map(f => f.auc));
+  const driftN = FEATURES.filter(f => f.drift > 0.1).length;
+  const missN  = FEATURES.filter(f => f.miss > 0.15).length;
+  const kpis = el('div', 'kpis');
+  [
+    { l: 'Features tracked', v: FEATURES.length, s: `${NUM_FEATURES.length} numeric · ${CAT_FEATURES.length} categorical`, cls: '' },
+    { l: 'Median univariate AUC', v: medAUC.toFixed(3), s: 'encoded features vs label', cls: 'kpi-accent' },
+    { l: 'Drift flags', v: driftN, s: 'features with Val→OOT AUC drop > 0.10', cls: driftN > 0 ? 'kpi-warn' : '' },
+    { l: 'Missingness flags', v: missN, s: 'features with missing rate > 15%', cls: missN > 0 ? 'kpi-warn' : '' },
+  ].forEach(k => {
+    const c = el('div', 'kpi ' + k.cls);
+    c.innerHTML = `<div class="kpi-l">${k.l}</div><div class="kpi-v">${k.v}</div><div class="kpi-s">${k.s}</div>`;
+    kpis.appendChild(c);
+  });
+  mainEl.appendChild(kpis);
+
+  // Two-column: alerts + top features
+  const row = el('div', 'row2');
+
+  // Alerts
+  const alerts = el('div', 'card');
+  alerts.style.padding = '14px 16px';
+  alerts.innerHTML = `<div class="sec-title">Findings to review</div>`;
+  const alertItems = [
+    { kind: 'bad',  f: 'address_change_30d', msg: 'AUC dropped from 0.59 → 0.40 in OOT window (−32%). Investigate upstream data source.' },
+    { kind: 'bad',  f: 'email_domain_risk',  msg: 'Distribution shift detected — mean Z-score exceeds +3σ on 9 of 30 OOT days.' },
+    { kind: 'warn', f: 'ua_rarity',          msg: 'Missingness climbed to 46% in OOT (was 22% in train). Consider imputation strategy.' },
+    { kind: 'warn', f: '3ds_outcome',        msg: 'Category "bypass" share grew 3× in OOT weeks — downstream authorization change?' },
+  ];
+  alertItems.forEach(a => {
+    const row = el('div', `alert ${a.kind === 'bad' ? 'bad' : ''}`);
+    row.innerHTML = `<div><span class="fcode" data-feat="${a.f}">${a.f}</span> <code>${a.kind.toUpperCase()}</code><br>${a.msg}</div>`;
+    row.querySelector('.fcode').onclick = () => navigate(`feature/${a.f}`);
+    alerts.appendChild(row);
+  });
+
+  // Top features table
+  const topCard = el('div', 'card');
+  topCard.style.padding = '0';
+  const tbl = el('div');
+  tbl.style.padding = '14px 16px 8px';
+  tbl.innerHTML = `<div class="sec-title">Top features (by gain importance)</div>`;
+  topCard.appendChild(tbl);
+  const table = el('table', 'ftbl');
+  table.innerHTML = `<thead><tr><th>Feature</th><th>Imp.</th><th>AUC</th><th>Missing</th><th>Status</th></tr></thead>`;
+  const tbody = el('tbody');
+  const maxImp = Math.max(...FEATURES.map(f => f.imp));
+  FEATURES.slice(0, 10).forEach(f => {
+    const status = f.drift > 0.1 ? '<span class="pill pill-bad">drift</span>'
+                 : f.miss > 0.15 ? '<span class="pill pill-warn">missing</span>'
+                 : '<span class="pill pill-good">ok</span>';
+    const tr = el('tr');
+    tr.innerHTML = `
+      <td><strong>${f.n}</strong></td>
+      <td><span class="bar-mini" style="width:${(f.imp / maxImp) * 60}px"></span> ${f.imp.toFixed(3)}</td>
+      <td>${f.auc.toFixed(2)}</td>
+      <td>${(f.miss * 100).toFixed(1)}%</td>
+      <td>${status}</td>
+    `;
+    tr.onclick = () => navigate(`feature/${f.n}`);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  topCard.appendChild(table);
+
+  row.appendChild(alerts);
+  row.appendChild(topCard);
+  mainEl.appendChild(row);
+
+  // Drift-at-a-glance strip chart
+  const { wrap, plot } = chartCard(
+    'Val → OOT AUC delta',
+    'Bar = AUC change per feature (negative = degradation in OOT). Click a bar to open its behavior page.',
+    'plot-overview-delta', 300
+  );
+  mainEl.appendChild(wrap);
+  const deltas = FEATURES.map(f => -f.drift - (Math.random()*0.02-0.01));
+  const colors = deltas.map(d => d < -0.1 ? '#ef4444' : d < -0.05 ? '#f59e0b' : '#10b981');
+  const sortedIdx = deltas.map((_, i) => i).sort((a, b) => deltas[a] - deltas[b]);
+  Plotly.newPlot(plot, [{
+    type: 'bar',
+    x: sortedIdx.map(i => FEATURES[i].n),
+    y: sortedIdx.map(i => deltas[i]),
+    marker: { color: sortedIdx.map(i => colors[i]) },
+    hovertemplate: '<b>%{x}</b><br>Δ AUC: %{y:.3f}<extra></extra>'
+  }], baseLayout({
+    yaxis: { title: 'Δ AUC (Val → OOT)', gridcolor: '#f1f5f9', zeroline: true, zerolinecolor: '#94a3b8' },
+    xaxis: { tickangle: -35 },
+    margin: { t: 14, r: 20, b: 90, l: 70 }
+  }), COMMON_CFG);
+  plot.on('plotly_click', ev => {
+    const name = ev.points[0].x;
+    navigate(`feature/${name}`);
+  });
+};
+
+// ------- TIME DRIFT -------
+function heatmapOverTime(plotEl, title, zMatrix, xLabels, yLabels, colorscale, zrange, colorbarTitle, oot) {
+  const data = [{
+    type: 'heatmap',
+    z: zMatrix, x: xLabels, y: yLabels,
+    colorscale, zmin: zrange[0], zmax: zrange[1],
+    colorbar: { title: { text: colorbarTitle, font: { size: 11 } }, thickness: 12, len: 0.9 },
+    hovertemplate: '<b>%{y}</b><br>%{x}<br>value: %{z:.3f}<extra></extra>'
+  }];
+  const layout = baseLayout({
+    margin: { t: 20, r: 60, b: 60, l: 130 },
+    xaxis: { tickangle: -45, showgrid: false },
+    yaxis: { showgrid: false, autorange: 'reversed' },
+    shapes: oot != null ? [ootLineShape(xLabels[oot])] : [],
+    annotations: oot != null ? [ootAnnotation(xLabels[oot])] : [],
+  });
+  Plotly.newPlot(plotEl, data, layout, COMMON_CFG);
+}
+
+ROUTES['time-drift/auc'] = () => {
+  mainEl.appendChild(pageHeader(
+    'AUC over time',
+    'Univariate AUC between each encoded feature and the label, computed per week and per day. Watch for features whose signal degrades after the OOT boundary.'
+  ));
+  const feats = FEATURES.map(f => f.n);
+
+  const c1 = chartCard('Weekly univariate AUC', `Heatmap · features × ${N_WEEKS} weeks`, 'plot-weekly-auc', 460);
+  mainEl.appendChild(c1.wrap);
+  const weeklyZ = feats.map(f => weeklyAUC[f]);
+  heatmapOverTime(c1.plot, 'Weekly AUC', weeklyZ, WEEKS, feats, 'Magma', [0.45, 0.85], 'AUC', OOT_WEEK);
+
+  const c2 = chartCard('Daily univariate AUC', `Heatmap · features × ${N_DAYS} days`, 'plot-daily-auc', 460);
+  mainEl.appendChild(c2.wrap);
+  const dailyZ = feats.map(f => dailyAUC[f]);
+  heatmapOverTime(c2.plot, 'Daily AUC', dailyZ, DATES, feats, 'Magma', [0.45, 0.85], 'AUC', OOT_DAY);
+};
+
+ROUTES['time-drift/missing'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Missing rate',
+    'Raw missing / null-like share per feature over time. Spikes often precede downstream performance loss.'
+  ));
+  const feats = FEATURES.map(f => f.n);
+
+  const c1 = chartCard('Weekly missing rate', 'Heatmap · z-range [0, 1]', 'plot-weekly-miss', 460);
+  mainEl.appendChild(c1.wrap);
+  heatmapOverTime(c1.plot, 'Weekly missing', feats.map(f => weeklyMiss[f]), WEEKS, feats, 'Blues', [0, 1], 'missing', OOT_WEEK);
+
+  const c2 = chartCard('Daily missing rate', 'Heatmap · z-range [0, 1]', 'plot-daily-miss', 460);
+  mainEl.appendChild(c2.wrap);
+  heatmapOverTime(c2.plot, 'Daily missing', feats.map(f => dailyMiss[f]), DATES, feats, 'Blues', [0, 1], 'missing', OOT_DAY);
+};
+
+// ------- FEATURE PICKER (reusable) -------
+function featurePicker(currentName, featList, onChange) {
+  const bar = el('div', 'controls');
+  const idx = featList.indexOf(currentName);
+  bar.innerHTML = `
+    <div class="ctl">
+      <label>Feature</label>
+      <select id="fp-sel">${featList.map(f => `<option value="${f}" ${f===currentName?'selected':''}>${f}</option>`).join('')}</select>
+    </div>
+    <div class="ctl">
+      <button id="fp-prev" ${idx<=0?'disabled':''}>← Prev</button>
+      <button id="fp-next" ${idx>=featList.length-1?'disabled':''}>Next →</button>
+    </div>
+    <div class="ctl" style="font-size:12px;color:var(--dim);">
+      <span>Feature ${idx+1} of ${featList.length}</span>
+    </div>
+    <a class="ff-jump-link" id="fp-focus">Open full feature page →</a>
+  `;
+  bar.querySelector('#fp-sel').onchange = e => onChange(e.target.value);
+  bar.querySelector('#fp-prev').onclick = () => { if (idx > 0) onChange(featList[idx-1]); };
+  bar.querySelector('#fp-next').onclick = () => { if (idx < featList.length-1) onChange(featList[idx+1]); };
+  bar.querySelector('#fp-focus').onclick = () => navigate(`feature/${currentName}`);
+  return bar;
+}
+
+// ------- BEHAVIOR -------
+ROUTES['behavior'] = (params) => {
+  const feat = resolveFeature(params);
+  setLastFeature(feat);
+  const f = FMAP[feat];
+  mainEl.appendChild(pageHeader(
+    'Behavior',
+    'For each feature: bucket counts (volume) alongside the in-bucket fraud rate and the model\'s mean score. Monotonicity and score-vs-rate alignment indicate a well-behaved feature.'
+  ));
+  const allNames = FEATURES.map(f => f.n);
+  mainEl.appendChild(featurePicker(feat, allNames, name => navigate('behavior', { f: name })));
+
+  const b = behavior[feat];
+  // Feature meta card
+  const meta = el('div', 'kpis');
+  [
+    { l: 'Type',       v: f.t === 'num' ? 'numeric' : 'categorical', s: f.t === 'num' ? '10 quantile buckets' : `${f.cats.length} categories` },
+    { l: 'Importance', v: f.imp.toFixed(3), s: 'Gain contribution' },
+    { l: 'AUC',        v: f.auc.toFixed(2), s: 'Univariate, train' },
+    { l: 'Missing',    v: (f.miss*100).toFixed(1) + '%', s: f.miss > 0.15 ? 'High — watch for imputation effects' : 'Within tolerance' },
+  ].forEach(k => {
+    const c = el('div', 'kpi');
+    c.innerHTML = `<div class="kpi-l">${k.l}</div><div class="kpi-v">${k.v}</div><div class="kpi-s">${k.s}</div>`;
+    meta.appendChild(c);
+  });
+  mainEl.appendChild(meta);
+
+  const { wrap, plot } = chartCard(`Bucket behavior · ${feat}`, 'Bar: count (left axis) · Lines: fraud rate and mean model score (right axis)', 'plot-behavior', 440);
+  mainEl.appendChild(wrap);
+  Plotly.newPlot(plot, [
+    { type: 'bar', x: b.buckets, y: b.count, name: 'Count', marker: { color: '#8ecae6' }, yaxis: 'y' },
+    { type: 'scatter', mode: 'lines+markers', x: b.buckets, y: b.fraudRate, name: 'Fraud rate',
+      line: { color: '#e63946', width: 2.5 }, marker: { size: 7 }, yaxis: 'y2' },
+    { type: 'scatter', mode: 'lines+markers', x: b.buckets, y: b.meanScore, name: 'Mean model score',
+      line: { color: '#7209b7', width: 2.2, dash: 'dash' }, marker: { size: 6 }, yaxis: 'y2' },
+  ], baseLayout({
+    xaxis: { title: f.t === 'num' ? 'Quantile bucket' : 'Category', tickangle: f.t === 'cat' ? -30 : 0 },
+    yaxis: { title: 'Count', gridcolor: '#f1f5f9' },
+    yaxis2: { title: 'Rate / score', overlaying: 'y', side: 'right', rangemode: 'tozero', gridcolor: 'transparent' },
+    legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center' },
+    margin: { t: 14, r: 60, b: 70, l: 70 },
+  }), COMMON_CFG);
+};
+
+// ------- PDP -------
+ROUTES['pdp'] = (params) => {
+  const feat = resolveFeature(params, f => f.t === 'num');
+  setLastFeature(feat);
+  const f = FMAP[feat];
+  mainEl.appendChild(pageHeader(
+    'Partial dependence',
+    'Model-averaged effect of each numeric feature on predicted fraud probability, holding all else fixed. The gray dashed line is the overall baseline (mean model score).'
+  ));
+  mainEl.appendChild(featurePicker(feat, NUM_FEATURES, name => navigate('pdp', { f: name })));
+  const p = pdp[feat];
+  const { wrap, plot } = chartCard(`PDP · ${feat}`, `Baseline mean p̂ = ${p.baseline.toFixed(3)}`, 'plot-pdp', 440);
+  mainEl.appendChild(wrap);
+  Plotly.newPlot(plot, [
+    { type: 'scatter', mode: 'lines', x: p.xs, y: p.ys, name: 'avg p(fraud)',
+      line: { color: '#6366f1', width: 3 }, hovertemplate: 'feature: %{x:.2f}<br>p̂: %{y:.3f}<extra></extra>' },
+  ], baseLayout({
+    xaxis: { title: `${feat} (scaled 0–1)`, gridcolor: '#f1f5f9' },
+    yaxis: { title: 'avg p̂', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+    shapes: [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: p.baseline, y1: p.baseline, line: { color: '#94a3b8', dash: 'dash', width: 1.5 }}],
+    annotations: [{ xref: 'paper', yref: 'y', x: 1, y: p.baseline, text: 'baseline', showarrow: false, font: { size: 10, color: '#64748b' }, xanchor: 'right', yshift: -8 }]
+  }), COMMON_CFG);
+};
+
+// ------- BIVARIATE -------
+ROUTES['bivariate'] = (params) => {
+  const allNames = FEATURES.map(f => f.n);
+  const f1 = params.f1 && FMAP[params.f1] ? params.f1 : 'amt_log';
+  const f2 = params.f2 && FMAP[params.f2] && params.f2 !== f1 ? params.f2 : 'velocity_24h';
+  mainEl.appendChild(pageHeader(
+    'Bivariate fraud rate',
+    'Fraud rate within each 5×5 bin of a feature pair. Strong interactions show up as corners or stripes that are darker than either marginal would predict.'
+  ));
+  const bar = el('div', 'controls');
+  bar.innerHTML = `
+    <div class="ctl"><label>Feature 1 (rows)</label><select id="bv-f1">${allNames.map(n => `<option value="${n}" ${n===f1?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="ctl"><label>Feature 2 (cols)</label><select id="bv-f2">${allNames.map(n => `<option value="${n}" ${n===f2?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="ctl" style="margin-left:auto"><button id="bv-swap">⇄ Swap axes</button></div>
+  `;
+  mainEl.appendChild(bar);
+  bar.querySelector('#bv-f1').onchange = e => navigate('bivariate', { f1: e.target.value, f2 });
+  bar.querySelector('#bv-f2').onchange = e => navigate('bivariate', { f1, f2: e.target.value });
+  bar.querySelector('#bv-swap').onclick = () => navigate('bivariate', { f1: f2, f2: f1 });
+
+  const bv = bivariateFR(f1, f2);
+  const { wrap, plot } = chartCard(
+    `${f1}  ×  ${f2}`,
+    'Cell = mean(fraud) in that (bin₁, bin₂) bucket. Hover for count.',
+    'plot-bv', 480
+  );
+  mainEl.appendChild(wrap);
+  const text = bv.z.map((row, i) => row.map((v, j) => `p=${(v*100).toFixed(1)}%<br>n=${bv.cnt[i][j]}`));
+  Plotly.newPlot(plot, [{
+    type: 'heatmap',
+    z: bv.z,
+    x: ['Q1','Q2','Q3','Q4','Q5'], y: ['Q1','Q2','Q3','Q4','Q5'],
+    colorscale: 'Reds', zmin: 0,
+    text, texttemplate: '%{text}', textfont: { size: 11 },
+    colorbar: { title: { text: 'fraud rate', font: { size: 11 }}, thickness: 12, tickformat: '.0%' },
+    hovertemplate: `${f1} %{y}<br>${f2} %{x}<br>%{text}<extra></extra>`
+  }], baseLayout({
+    xaxis: { title: f2, side: 'bottom' },
+    yaxis: { title: f1, autorange: 'reversed' },
+    margin: { t: 14, r: 70, b: 70, l: 100 }
+  }), COMMON_CFG);
+};
+
+// ------- ANOMALIES -------
+ROUTES['anomalies/robust-z'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Robust z-score of daily medians',
+    'Per-feature daily median, re-scored against its own baseline using MAD. Cells ≥ |3σ| are candidates for data-quality investigation.'
+  ));
+  const feats = FEATURES.map(f => f.n);
+  const { wrap, plot } = chartCard('Robust z-score heatmap', 'z = (daily median − baseline) / (MAD × 1.4826)', 'plot-anom-z', 520);
+  mainEl.appendChild(wrap);
+  const z = feats.map(f => anomZ[f]);
+  Plotly.newPlot(plot, [{
+    type: 'heatmap',
+    z, x: DATES, y: feats,
+    colorscale: 'RdBu', reversescale: true, zmid: 0, zmin: -5, zmax: 5,
+    colorbar: { title: { text: 'z (±5)', font: {size:11} }, thickness: 12 },
+    hovertemplate: '<b>%{y}</b><br>%{x}<br>z = %{z:.2f}<extra></extra>'
+  }], baseLayout({
+    xaxis: { tickangle: -45, showgrid: false, nticks: 14 },
+    yaxis: { showgrid: false, autorange: 'reversed' },
+    shapes: [ootLineShape(DATES[OOT_DAY])],
+    annotations: [ootAnnotation(DATES[OOT_DAY])],
+    margin: { t: 20, r: 60, b: 60, l: 130 }
+  }), COMMON_CFG);
+};
+
+ROUTES['anomalies/mean-drift'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Mean drift',
+    'Standardized daily mean per feature (subtract the long-run mean, divide by long-run std). Highlights slow drifts that robust-z can miss.'
+  ));
+  const feats = FEATURES.map(f => f.n);
+  const { wrap, plot } = chartCard('Mean drift heatmap', 'σ vs. feature baseline mean', 'plot-anom-mean', 520);
+  mainEl.appendChild(wrap);
+  Plotly.newPlot(plot, [{
+    type: 'heatmap',
+    z: feats.map(f => anomMean[f]),
+    x: DATES, y: feats,
+    colorscale: 'RdBu', reversescale: true, zmid: 0, zmin: -4, zmax: 4,
+    colorbar: { title: { text: 'σ vs mean', font: {size:11} }, thickness: 12 },
+    hovertemplate: '<b>%{y}</b><br>%{x}<br>σ = %{z:.2f}<extra></extra>'
+  }], baseLayout({
+    xaxis: { tickangle: -45, showgrid: false, nticks: 14 },
+    yaxis: { showgrid: false, autorange: 'reversed' },
+    shapes: [ootLineShape(DATES[OOT_DAY])],
+    annotations: [ootAnnotation(DATES[OOT_DAY])],
+    margin: { t: 20, r: 60, b: 60, l: 130 }
+  }), COMMON_CFG);
+};
+
+ROUTES['anomalies/spreads'] = (params) => {
+  const feat = resolveFeature(params, f => f.t === 'num');
+  setLastFeature(feat);
+  mainEl.appendChild(pageHeader(
+    'Distribution spreads',
+    'Daily distribution summary per feature: IQR band (Q1→Q3), mean line, and min/max envelope. Useful for spotting tail behavior changes.'
+  ));
+  mainEl.appendChild(featurePicker(feat, NUM_FEATURES, name => navigate('anomalies/spreads', { f: name })));
+  const s = spreads[feat];
+  const { wrap, plot } = chartCard(`Spread bands · ${feat}`, 'Left axis: mean + IQR · Right axis: min/max', 'plot-spreads', 460);
+  mainEl.appendChild(wrap);
+  Plotly.newPlot(plot, [
+    { type: 'scatter', x: DATES, y: s.q1, mode: 'lines', line: { width: 0 }, name: 'Q1', showlegend: false, hoverinfo: 'skip' },
+    { type: 'scatter', x: DATES, y: s.q3, mode: 'lines', fill: 'tonexty', fillcolor: 'rgba(99,102,241,0.20)',
+      line: { width: 0 }, name: 'IQR band', hoverinfo: 'skip' },
+    { type: 'scatter', x: DATES, y: s.mean, mode: 'lines', name: 'mean', line: { color: '#c0392b', width: 2 },
+      hovertemplate: '%{x}<br>mean: %{y:.2f}<extra></extra>' },
+    { type: 'scatter', x: DATES, y: s.min, mode: 'lines', name: 'min', line: { color: '#94a3b8', dash: 'dot', width: 1 }, yaxis: 'y2', hoverinfo: 'skip' },
+    { type: 'scatter', x: DATES, y: s.max, mode: 'lines', name: 'max', line: { color: '#475569', dash: 'dot', width: 1 }, yaxis: 'y2', hoverinfo: 'skip' },
+  ], baseLayout({
+    xaxis: { nticks: 14, showgrid: false },
+    yaxis: { title: 'mean · IQR', gridcolor: '#f1f5f9' },
+    yaxis2: { title: 'min · max', overlaying: 'y', side: 'right', gridcolor: 'transparent' },
+    legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center' },
+    shapes: [ootLineShape(DATES[OOT_DAY])],
+    annotations: [ootAnnotation(DATES[OOT_DAY])],
+    margin: { t: 14, r: 60, b: 60, l: 60 }
+  }), COMMON_CFG);
+};
+
+// ------- CATEGORICAL -------
+ROUTES['categorical'] = (params) => {
+  const feat = resolveFeature(params, f => f.t === 'cat');
+  setLastFeature(feat);
+  const f = FMAP[feat];
+  mainEl.appendChild(pageHeader(
+    'Categorical stability',
+    'Daily share of each category. Stacked areas that shift after OOT indicate upstream population change — a common root cause of model decay on categorical features.'
+  ));
+  mainEl.appendChild(featurePicker(feat, CAT_FEATURES, name => navigate('categorical', { f: name })));
+
+  const shares = catShares[feat];
+  const palette = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#ec4899','#14b8a6','#64748b'];
+  const traces = f.cats.map((cat, i) => ({
+    type: 'scatter', mode: 'lines', x: DATES, y: shares[i],
+    stackgroup: 'one', name: cat, line: { width: 0.5, color: palette[i % palette.length] },
+    fillcolor: palette[i % palette.length], hovertemplate: `${cat}: %{y:.1%}<extra></extra>`
+  }));
+  const { wrap, plot } = chartCard(`Daily category share · ${feat}`, `${f.cats.length} categories · stacked to 100%`, 'plot-cat', 460);
+  mainEl.appendChild(wrap);
+  Plotly.newPlot(plot, traces, baseLayout({
+    xaxis: { nticks: 14, showgrid: false },
+    yaxis: { title: 'share', range: [0, 1], tickformat: '.0%' },
+    legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center' },
+    shapes: [ootLineShape(DATES[OOT_DAY])],
+    annotations: [ootAnnotation(DATES[OOT_DAY])],
+    margin: { t: 14, r: 20, b: 60, l: 60 }
+  }), COMMON_CFG);
+};
+
+// ------- PERMUTATION -------
+function permHeatmap(plotEl, z, xLabels, yLabels, oot) {
+  Plotly.newPlot(plotEl, [{
+    type: 'heatmap',
+    z, x: xLabels, y: yLabels,
+    colorscale: 'Plasma', zmin: 0, zmax: 0.06,
+    colorbar: { title: { text: 'Δ AUC', font: {size:11} }, thickness: 12 },
+    hovertemplate: '<b>%{y}</b><br>%{x}<br>Δ AUC: %{z:.4f}<extra></extra>'
+  }], baseLayout({
+    xaxis: { tickangle: -45, showgrid: false, nticks: xLabels.length > 30 ? 14 : undefined },
+    yaxis: { showgrid: false, autorange: 'reversed' },
+    shapes: [ootLineShape(xLabels[oot])],
+    annotations: [ootAnnotation(xLabels[oot])],
+    margin: { t: 20, r: 60, b: 60, l: 130 }
+  }), COMMON_CFG);
+}
+
+ROUTES['permutation/weekly'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Weekly permutation importance',
+    'AUC drop when each feature is shuffled, computed per calendar week on a capped sample. Features that hold importance across the OOT boundary are the robust ones.'
+  ));
+  const feats = FEATURES.map(f => f.n);
+  const { wrap, plot } = chartCard('Weekly permutation importance', 'Δ AUC when shuffled · per week', 'plot-perm-w', 500);
+  mainEl.appendChild(wrap);
+  permHeatmap(plot, feats.map(f => weeklyPerm[f]), WEEKS, feats, OOT_WEEK);
+};
+
+ROUTES['permutation/daily'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Daily permutation importance',
+    'Same measure at day granularity — noisier but catches short bursts where a feature suddenly matters more (or stops mattering).'
+  ));
+  const feats = FEATURES.map(f => f.n);
+  const { wrap, plot } = chartCard('Daily permutation importance', 'Δ AUC when shuffled · per day', 'plot-perm-d', 500);
+  mainEl.appendChild(wrap);
+  permHeatmap(plot, feats.map(f => dailyPerm[f]), DATES, feats, OOT_DAY);
+};
+
+// ------- CLUSTERING -------
+ROUTES['clustering/methods'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Methods comparison',
+    'KMeans silhouette across k, plus PCA (PC1 vs. PC2) scatter colored by four clustering methods. Compare structure consistency across train/val/OOT.'
+  ));
+
+  const c1 = chartCard('KMeans silhouette vs. k', 'Per split (train / val / OOT)', 'plot-sil', 320);
+  mainEl.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { type: 'scatter', mode: 'lines+markers', x: CLUSTERS.ks, y: CLUSTERS.silhouette.train, name: 'train',
+      line: { color: '#6366f1', width: 2.5 }, marker: { size: 8 } },
+    { type: 'scatter', mode: 'lines+markers', x: CLUSTERS.ks, y: CLUSTERS.silhouette.val, name: 'val',
+      line: { color: '#10b981', width: 2.5 }, marker: { size: 8 } },
+    { type: 'scatter', mode: 'lines+markers', x: CLUSTERS.ks, y: CLUSTERS.silhouette.oot, name: 'OOT',
+      line: { color: '#ef4444', width: 2.5 }, marker: { size: 8 } },
+  ], baseLayout({
+    xaxis: { title: 'k', dtick: 1, gridcolor: '#f1f5f9' },
+    yaxis: { title: 'silhouette', gridcolor: '#f1f5f9' },
+    legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center' },
+    margin: { t: 14, r: 20, b: 50, l: 60 }
+  }), COMMON_CFG);
+
+  // 2x2 scatter grid
+  const scatterGrid = el('div');
+  scatterGrid.style.display = 'grid';
+  scatterGrid.style.gridTemplateColumns = '1fr 1fr';
+  scatterGrid.style.gap = '14px';
+  const methodColors = { KMeans: 'Turbo', Ward: 'Portland', GMM: 'Viridis', DBSCAN: 'Turbo' };
+  ['KMeans', 'Ward', 'GMM', 'DBSCAN'].forEach((m, i) => {
+    const sc = chartCard(`${m} · PC1 × PC2`, '400-point sample of OOT', `plot-sc-${i}`, 320);
+    scatterGrid.appendChild(sc.wrap);
+    const d = CLUSTERS.scatters[m];
+    // DBSCAN: remap noise (-1) to max+1
+    const labels = d.lbl.slice();
+    if (m === 'DBSCAN') {
+      const mx = Math.max(...labels.filter(l => l !== -1));
+      for (let j = 0; j < labels.length; j++) if (labels[j] === -1) labels[j] = mx + 1;
+    }
+    Plotly.newPlot(sc.plot, [{
+      type: 'scatter', mode: 'markers', x: d.x, y: d.y,
+      marker: { color: labels, colorscale: methodColors[m], size: 5, opacity: 0.75, line: { width: 0 } },
+      hovertemplate: 'PC1: %{x:.2f}<br>PC2: %{y:.2f}<br>cluster: %{marker.color}<extra></extra>'
+    }], baseLayout({
+      xaxis: { title: 'PC1', gridcolor: '#f1f5f9', zeroline: false },
+      yaxis: { title: 'PC2', gridcolor: '#f1f5f9', zeroline: false },
+      margin: { t: 12, r: 16, b: 44, l: 50 }, showlegend: false
+    }), COMMON_CFG);
+  });
+  mainEl.appendChild(scatterGrid);
+};
+
+ROUTES['clustering/profiles'] = () => {
+  mainEl.appendChild(pageHeader(
+    'Profiles & time mix',
+    'Mean standardized value per cluster × top feature (what makes each cluster), plus how cluster shares evolved across OOT weeks and week-to-week L1 drift.'
+  ));
+
+  const c1 = chartCard('Cluster × feature profile', 'Mean Z per KMeans cluster (k=4)', 'plot-profile', 280);
+  mainEl.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [{
+    type: 'heatmap',
+    z: CLUSTERS.profile,
+    x: CLUSTERS.topFeats,
+    y: ['C0', 'C1', 'C2', 'C3'],
+    colorscale: 'RdBu', reversescale: true, zmid: 0, zmin: -2.5, zmax: 2.5,
+    colorbar: { title: { text: 'mean Z', font: {size:11} }, thickness: 12 },
+    hovertemplate: '<b>%{y} × %{x}</b><br>Z: %{z:.2f}<extra></extra>'
+  }], baseLayout({
+    xaxis: { tickangle: -30, showgrid: false },
+    yaxis: { showgrid: false, autorange: 'reversed' },
+    margin: { t: 14, r: 60, b: 90, l: 60 }
+  }), COMMON_CFG);
+
+  const row = el('div', 'row2');
+  const c2 = chartCard('OOT weekly cluster mix', 'Stacked share, C0–C3', 'plot-mix', 320);
+  row.appendChild(c2.wrap);
+  const palette = ['#6366f1', '#10b981', '#f59e0b', '#ef4444'];
+  const mixTraces = [0,1,2,3].map(c => ({
+    type: 'scatter', mode: 'lines', x: CLUSTERS.ootWeeks, y: CLUSTERS.mix[c],
+    stackgroup: 'mix', name: `C${c}`,
+    line: { width: 0.5, color: palette[c] }, fillcolor: palette[c],
+    hovertemplate: `C${c}: %{y:.1%}<extra></extra>`
+  }));
+  Plotly.newPlot(c2.plot, mixTraces, baseLayout({
+    xaxis: { tickangle: -30, showgrid: false },
+    yaxis: { title: 'share', range: [0, 1], tickformat: '.0%' },
+    legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center' },
+    margin: { t: 14, r: 20, b: 60, l: 50 }
+  }), COMMON_CFG);
+
+  const c3 = chartCard('Week-to-week mix drift', 'Σ |Δ share|  (L1 norm)', 'plot-drift', 320);
+  row.appendChild(c3.wrap);
+  Plotly.newPlot(c3.plot, [{
+    type: 'scatter', mode: 'lines+markers', x: CLUSTERS.ootWeeks.slice(1), y: CLUSTERS.drift,
+    line: { color: '#ef4444', width: 2.5 }, marker: { size: 8 },
+    hovertemplate: 'week → %{x}<br>L1 drift: %{y:.3f}<extra></extra>', name: 'L1 drift'
+  }], baseLayout({
+    xaxis: { title: 'week (to)', tickangle: -30, showgrid: false },
+    yaxis: { title: 'Σ |Δ share|', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+    margin: { t: 14, r: 20, b: 60, l: 60 }, showlegend: false
+  }), COMMON_CFG);
+
+  mainEl.appendChild(row);
+};
+
+/* =========================================================================
+   FEATURE FOCUS PAGE — unified per-feature view
+   ========================================================================= */
+function renderFeatureFocus(featName, params) {
+  if (!FMAP[featName]) { navigate('overview'); return; }
+  setLastFeature(featName);
+  const vsRaw = (params.vs || '').split(',').map(s => s.trim()).filter(Boolean);
+  const seen = new Set([featName]);
+  const vsList = [];
+  for (const v of vsRaw) {
+    if (FMAP[v] && !seen.has(v)) { vsList.push(v); seen.add(v); }
+    if (vsList.length >= 4) break;  // anchor + up to 4 = 5 total
+  }
+  if (vsList.length) renderFeatureCompare([featName, ...vsList]);
+  else               renderFeatureSingle(featName);
+}
+
+const COMPARE_COLORS = ['#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
+const COMPARE_TAGS = ['A', 'B', 'C', 'D', 'E'];
+const MAX_COMPARE = 5;
+
+function compareMeta(features) {
+  return features.map((name, i) => ({
+    name, feat: FMAP[name],
+    color: COMPARE_COLORS[i], tag: COMPARE_TAGS[i],
+    tagClass: `ff-side-${COMPARE_TAGS[i].toLowerCase()}`,
+  }));
+}
+
+function compareControlBar(features) {
+  // features[0] is the anchor. features[1..] are comparison features.
+  const bar = el('div', 'ff-compare-bar');
+  const anchor = features[0];
+  const comparisons = features.slice(1);
+
+  if (comparisons.length === 0) {
+    // Single-feature mode — "add a comparison" UI
+    const options = FEATURES.filter(f => f.n !== anchor)
+      .sort((a, b) => b.imp - a.imp)
+      .map(f => `<option value="${f.n}">${f.n}</option>`).join('');
+    bar.innerHTML = `
+      <label>Compare</label>
+      <span style="font-size:12px;color:var(--dim);">Side-by-side with another feature:</span>
+      <select id="cmp-sel"><option value="">(pick a feature…)</option>${options}</select>
+      <button id="cmp-go" class="btn-primary" disabled>Compare →</button>
+    `;
+    const sel = bar.querySelector('#cmp-sel');
+    const go = bar.querySelector('#cmp-go');
+    sel.onchange = () => { go.disabled = !sel.value; };
+    go.onclick = () => { if (sel.value) navigate(`feature/${anchor}`, { vs: sel.value }); };
+    return bar;
+  }
+
+  // Multi-compare mode — chips
+  const label = el('span');
+  label.innerHTML = `<label style="margin-right:4px">Compare</label>`;
+  bar.appendChild(label);
+
+  // Anchor chip — static
+  const anchorChip = el('span', 'cmp-chip chip-anchor');
+  anchorChip.innerHTML = `<span class="ff-side-tag ff-side-a">A</span><span class="chip-name-static">${anchor}</span>`;
+  bar.appendChild(anchorChip);
+
+  // Comparison chips — each has a dropdown to change, and an × to remove
+  comparisons.forEach((featB, slotIdx) => {
+    const meta = compareMeta(features)[slotIdx + 1];
+    const chip = el('span', 'cmp-chip');
+    const options = FEATURES
+      .filter(ff => ff.n !== anchor && (ff.n === featB || !features.includes(ff.n)))
+      .sort((a, b) => b.imp - a.imp)
+      .map(ff => `<option value="${ff.n}" ${ff.n === featB ? 'selected' : ''}>${ff.n}</option>`).join('');
+    chip.innerHTML = `
+      <span class="ff-side-tag ${meta.tagClass}">${meta.tag}</span>
+      <select data-slot="${slotIdx}">${options}</select>
+      <button class="chip-remove" data-slot="${slotIdx}" title="Remove">×</button>
+    `;
+    bar.appendChild(chip);
+  });
+
+  // Add-feature dropdown (if under the cap)
+  if (features.length < MAX_COMPARE) {
+    const avail = FEATURES
+      .filter(f => !features.includes(f.n))
+      .sort((a, b) => b.imp - a.imp);
+    const addChip = el('span', 'cmp-chip');
+    addChip.style.background = 'white';
+    addChip.style.borderStyle = 'dashed';
+    addChip.innerHTML = `
+      <select id="cmp-add"><option value="">+ Add feature…</option>${avail.map(f => `<option value="${f.n}">${f.n}</option>`).join('')}</select>
+    `;
+    bar.appendChild(addChip);
+  } else {
+    const note = el('span');
+    note.style.fontSize = '11px';
+    note.style.color = 'var(--dim)';
+    note.textContent = `(max ${MAX_COMPARE} features)`;
+    bar.appendChild(note);
+  }
+
+  // Exit button — pinned to the right
+  const spacer = el('span'); spacer.style.marginLeft = 'auto';
+  bar.appendChild(spacer);
+  const exitBtn = el('button', 'btn-danger'); exitBtn.textContent = '× Exit compare';
+  bar.appendChild(exitBtn);
+
+  // Wire up handlers
+  bar.querySelectorAll('.cmp-chip select[data-slot]').forEach(sel => {
+    sel.onchange = e => {
+      const slot = parseInt(e.target.dataset.slot);
+      const newVs = [...comparisons];
+      newVs[slot] = e.target.value;
+      navigate(`feature/${anchor}`, { vs: newVs.join(',') });
+    };
+  });
+  bar.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.onclick = e => {
+      const slot = parseInt(e.currentTarget.dataset.slot);
+      const newVs = comparisons.filter((_, i) => i !== slot);
+      if (newVs.length === 0) navigate(`feature/${anchor}`);
+      else navigate(`feature/${anchor}`, { vs: newVs.join(',') });
+    };
+  });
+  const addSel = bar.querySelector('#cmp-add');
+  if (addSel) {
+    addSel.onchange = e => {
+      if (!e.target.value) return;
+      const newVs = [...comparisons, e.target.value];
+      navigate(`feature/${anchor}`, { vs: newVs.join(',') });
+    };
+  }
+  exitBtn.onclick = () => navigate(`feature/${anchor}`);
+  return bar;
+}
+
+function renderFeatureSingle(featName) {
+  const f = FMAP[featName];
+
+  // Prev/Next ordering by importance
+  const order = FEATURES_SORTED.map(x => x.n);
+  const idx = order.indexOf(featName);
+  const prevF = idx > 0 ? order[idx - 1] : null;
+  const nextF = idx < order.length - 1 ? order[idx + 1] : null;
+
+  // ---------- Hero header ----------
+  const hero = el('div', 'ff-hero');
+  const health = featureHealth(f);
+  const statusPill = health === 'bad' ? '<span class="pill pill-bad">drift flag</span>'
+                  : health === 'warn' ? '<span class="pill pill-warn">elevated missing</span>'
+                  : '<span class="pill pill-good">healthy</span>';
+  const typePill = `<span class="pill" style="background:#e0e7ff;color:#3730a3">${f.t === 'num' ? 'numeric' : 'categorical'}</span>`;
+  hero.innerHTML = `
+    <div class="ff-hero-main">
+      <h1 class="ff-hero-name">${featName}</h1>
+      <div class="ff-hero-meta">
+        ${typePill} ${statusPill}
+        <span>· importance rank <strong>#${idx + 1}</strong> of ${order.length}</span>
+        <span>· gain <strong>${f.imp.toFixed(3)}</strong></span>
+      </div>
+    </div>
+    <div class="ff-hero-nav">
+      <button id="ff-prev" ${prevF ? '' : 'disabled'}>← ${prevF || 'Prev'}</button>
+      <span class="ff-counter">${idx + 1} / ${order.length}</span>
+      <button id="ff-next" ${nextF ? '' : 'disabled'}>${nextF || 'Next'} →</button>
+    </div>
+  `;
+  mainEl.appendChild(hero);
+  if (prevF) hero.querySelector('#ff-prev').onclick = () => navigate(`feature/${prevF}`);
+  if (nextF) hero.querySelector('#ff-next').onclick = () => navigate(`feature/${nextF}`);
+
+  // Compare control (appears below hero)
+  mainEl.appendChild(compareControlBar([featName]));
+
+  // ---------- KPI cards ----------
+  const trainAUC = f.auc;
+  const ootAUCdaily = dailyAUC[featName].slice(OOT_DAY);
+  const ootAUC = ootAUCdaily.reduce((a, b) => a + b, 0) / ootAUCdaily.length;
+  const deltaAUC = ootAUC - trainAUC;
+  const ootMissing = dailyMiss[featName].slice(OOT_DAY).reduce((a, b) => a + b, 0) / ootAUCdaily.length;
+  const zMax = anomZ[featName].reduce((m, v) => Math.abs(v) > Math.abs(m) ? v : m, 0);
+  const zMaxDay = DATES[anomZ[featName].indexOf(zMax)] || DATES[0];
+
+  const kpis = el('div', 'kpis');
+  const deltaClass = deltaAUC < -0.1 ? 'delta-bad' : deltaAUC < -0.05 ? 'delta-warn' : 'delta-good';
+  [
+    { l: 'Train AUC',    v: trainAUC.toFixed(3), s: 'univariate, encoded vs label', cls: '' },
+    { l: 'OOT AUC',      v: ootAUC.toFixed(3),   s: `<span class="${deltaClass}">Δ ${(deltaAUC >= 0 ? '+' : '') + deltaAUC.toFixed(3)}</span> vs train`, cls: deltaAUC < -0.1 ? 'kpi-bad' : deltaAUC < -0.05 ? 'kpi-warn' : '' },
+    { l: 'OOT missing',  v: (ootMissing * 100).toFixed(1) + '%', s: `train: ${(f.miss * 100).toFixed(1)}%`, cls: ootMissing > 0.15 ? 'kpi-warn' : '' },
+    { l: 'Peak |z|',     v: Math.abs(zMax).toFixed(1) + 'σ', s: `on ${zMaxDay}`, cls: Math.abs(zMax) > 3 ? 'kpi-warn' : '' },
+  ].forEach(k => {
+    const c = el('div', 'kpi ' + k.cls);
+    c.innerHTML = `<div class="kpi-l">${k.l}</div><div class="kpi-v">${k.v}</div><div class="kpi-s">${k.s}</div>`;
+    kpis.appendChild(c);
+  });
+  mainEl.appendChild(kpis);
+
+  // ---------- Timeline at a glance: 4 small multiples ----------
+  mainEl.appendChild(el('div', 'ff-section-hd', 'Timeline at a glance'));
+  const timeline = el('div', 'ff-timeline');
+  mainEl.appendChild(timeline);
+
+  function miniChartBox(title, value, valueClass, sub, plotId) {
+    const box = el('div', 'ff-mini');
+    box.innerHTML = `<div class="ff-mini-t">${title}</div><div class="ff-mini-v ${valueClass || ''}">${value}</div><div class="ff-mini-s">${sub}</div>`;
+    const plot = el('div'); plot.id = plotId; plot.style.height = '90px'; plot.style.marginTop = '4px';
+    box.appendChild(plot);
+    timeline.appendChild(box);
+    return plot;
+  }
+  const miniLayout = (extra = {}) => baseLayout(Object.assign({
+    margin: { t: 4, r: 8, b: 14, l: 28 },
+    showlegend: false,
+    xaxis: { showgrid: false, showticklabels: false, zeroline: false },
+    yaxis: { gridcolor: '#f1f5f9', zeroline: false, tickfont: { size: 9 }, nticks: 3 },
+    shapes: [ootLineShape(DATES[OOT_DAY])],
+  }, extra));
+
+  // 1) Daily AUC
+  const aucPlot = miniChartBox('Daily AUC', trainAUC.toFixed(3), '', `median over ${N_DAYS}d`, 'ff-plot-auc');
+  Plotly.newPlot(aucPlot, [{
+    type: 'scatter', mode: 'lines', x: DATES, y: dailyAUC[featName],
+    line: { color: '#6366f1', width: 1.6 },
+    hovertemplate: '%{x}<br>AUC %{y:.3f}<extra></extra>'
+  }], miniLayout({ yaxis: { range: [0.45, 0.92], gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 } }), COMMON_CFG);
+
+  // 2) Missing
+  const missPlot = miniChartBox('Missing rate', (f.miss * 100).toFixed(1) + '%', ootMissing > 0.15 ? 'delta-warn' : '', `OOT: ${(ootMissing * 100).toFixed(1)}%`, 'ff-plot-miss');
+  Plotly.newPlot(missPlot, [{
+    type: 'scatter', mode: 'lines', x: DATES, y: dailyMiss[featName],
+    line: { color: '#0ea5e9', width: 1.4 }, fill: 'tozeroy', fillcolor: 'rgba(14,165,233,0.18)',
+    hovertemplate: '%{x}<br>%{y:.1%}<extra></extra>'
+  }], miniLayout({ yaxis: { tickformat: '.0%', rangemode: 'tozero', gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 } }), COMMON_CFG);
+
+  // 3) Mean drift (z)
+  const zPlot = miniChartBox('Mean drift', Math.abs(zMax).toFixed(1) + 'σ', Math.abs(zMax) > 3 ? 'delta-bad' : '', 'peak |z|', 'ff-plot-z');
+  Plotly.newPlot(zPlot, [{
+    type: 'scatter', mode: 'lines', x: DATES, y: anomMean[featName],
+    line: { color: '#ef4444', width: 1.4 },
+    hovertemplate: '%{x}<br>z=%{y:.2f}<extra></extra>'
+  }], miniLayout({ yaxis: { zeroline: true, zerolinecolor: '#cbd5e1', gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 } }), COMMON_CFG);
+
+  // 4) Weekly permutation importance
+  const permMean = weeklyPerm[featName].reduce((a, b) => a + b, 0) / weeklyPerm[featName].length;
+  const permPlot = miniChartBox('Permutation Δ AUC', permMean.toFixed(4), '', `mean over ${N_WEEKS} wk`, 'ff-plot-perm');
+  Plotly.newPlot(permPlot, [{
+    type: 'bar', x: WEEKS, y: weeklyPerm[featName],
+    marker: { color: '#7c3aed' },
+    hovertemplate: '%{x}<br>Δ AUC %{y:.4f}<extra></extra>'
+  }], miniLayout({ yaxis: { rangemode: 'tozero', gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 }, shapes: [ootLineShape(WEEKS[OOT_WEEK])] }), COMMON_CFG);
+
+  // ---------- Relationship with target ----------
+  mainEl.appendChild(el('div', 'ff-section-hd', 'Relationship with target'));
+
+  const b = behavior[featName];
+  const behaveCard = chartCard(
+    'Bucket behavior',
+    'Bar: count (left axis) · Lines: in-bucket fraud rate and mean model score (right axis)',
+    'ff-plot-behavior', 360
+  );
+  mainEl.appendChild(behaveCard.wrap);
+  Plotly.newPlot(behaveCard.plot, [
+    { type: 'bar', x: b.buckets, y: b.count, name: 'Count', marker: { color: '#8ecae6' } },
+    { type: 'scatter', mode: 'lines+markers', x: b.buckets, y: b.fraudRate, name: 'Fraud rate',
+      line: { color: '#e63946', width: 2.5 }, marker: { size: 7 }, yaxis: 'y2' },
+    { type: 'scatter', mode: 'lines+markers', x: b.buckets, y: b.meanScore, name: 'Mean model score',
+      line: { color: '#7209b7', width: 2.2, dash: 'dash' }, marker: { size: 6 }, yaxis: 'y2' },
+  ], baseLayout({
+    xaxis: { title: f.t === 'num' ? 'Quantile bucket' : 'Category', tickangle: f.t === 'cat' ? -30 : 0 },
+    yaxis: { title: 'Count', gridcolor: '#f1f5f9' },
+    yaxis2: { title: 'Rate / score', overlaying: 'y', side: 'right', rangemode: 'tozero' },
+    legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center' },
+    margin: { t: 14, r: 60, b: 60, l: 70 }
+  }), COMMON_CFG);
+
+  // ---------- Type-specific detail row ----------
+  if (f.t === 'num') {
+    const row = el('div', 'row2');
+    // PDP
+    const p = pdp[featName];
+    const pdpCard = chartCard('Partial dependence', `baseline mean p̂ = ${p.baseline.toFixed(3)}`, 'ff-plot-pdp', 300);
+    row.appendChild(pdpCard.wrap);
+    Plotly.newPlot(pdpCard.plot, [{
+      type: 'scatter', mode: 'lines', x: p.xs, y: p.ys,
+      line: { color: '#6366f1', width: 2.6 },
+      hovertemplate: 'feature: %{x:.2f}<br>p̂: %{y:.3f}<extra></extra>',
+      name: 'avg p(fraud)'
+    }], baseLayout({
+      xaxis: { title: `${featName} (scaled 0–1)`, gridcolor: '#f1f5f9' },
+      yaxis: { title: 'avg p̂', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+      shapes: [{ type: 'line', x0: 0, x1: 1, xref: 'paper', y0: p.baseline, y1: p.baseline, line: { color: '#94a3b8', dash: 'dash', width: 1.3 }}],
+      margin: { t: 14, r: 16, b: 46, l: 50 }, showlegend: false
+    }), COMMON_CFG);
+
+    // Spreads
+    const s = spreads[featName];
+    const spreadCard = chartCard('Distribution spreads', 'Daily IQR band, mean, and min/max', 'ff-plot-spread', 300);
+    row.appendChild(spreadCard.wrap);
+    Plotly.newPlot(spreadCard.plot, [
+      { type: 'scatter', x: DATES, y: s.q1, mode: 'lines', line: { width: 0 }, showlegend: false, hoverinfo: 'skip' },
+      { type: 'scatter', x: DATES, y: s.q3, mode: 'lines', fill: 'tonexty', fillcolor: 'rgba(99,102,241,0.20)',
+        line: { width: 0 }, name: 'IQR', hoverinfo: 'skip' },
+      { type: 'scatter', x: DATES, y: s.mean, mode: 'lines', name: 'mean', line: { color: '#c0392b', width: 1.8 },
+        hovertemplate: '%{x}<br>mean: %{y:.1f}<extra></extra>' },
+      { type: 'scatter', x: DATES, y: s.min, mode: 'lines', name: 'min', line: { color: '#94a3b8', dash: 'dot', width: 1 }, hoverinfo: 'skip' },
+      { type: 'scatter', x: DATES, y: s.max, mode: 'lines', name: 'max', line: { color: '#475569', dash: 'dot', width: 1 }, hoverinfo: 'skip' },
+    ], baseLayout({
+      xaxis: { nticks: 8, showgrid: false },
+      yaxis: { gridcolor: '#f1f5f9' },
+      legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center' },
+      shapes: [ootLineShape(DATES[OOT_DAY])],
+      margin: { t: 14, r: 16, b: 46, l: 50 }
+    }), COMMON_CFG);
+    mainEl.appendChild(row);
+  } else {
+    // Categorical: full-width stacked shares
+    const palette = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#ec4899','#14b8a6','#64748b'];
+    const shares = catShares[featName];
+    const traces = f.cats.map((cat, i) => ({
+      type: 'scatter', mode: 'lines', x: DATES, y: shares[i],
+      stackgroup: 'one', name: cat,
+      line: { width: 0.5, color: palette[i % palette.length] },
+      fillcolor: palette[i % palette.length],
+      hovertemplate: `${cat}: %{y:.1%}<extra></extra>`
+    }));
+    const catCard = chartCard('Daily category share', `${f.cats.length} categories · stacked to 100%`, 'ff-plot-cat', 320);
+    mainEl.appendChild(catCard.wrap);
+    Plotly.newPlot(catCard.plot, traces, baseLayout({
+      xaxis: { nticks: 10, showgrid: false },
+      yaxis: { title: 'share', range: [0, 1], tickformat: '.0%' },
+      legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center' },
+      shapes: [ootLineShape(DATES[OOT_DAY])],
+      margin: { t: 14, r: 16, b: 46, l: 50 }
+    }), COMMON_CFG);
+  }
+
+  // ---------- Top interactions ----------
+  mainEl.appendChild(el('div', 'ff-section-hd', 'Top interactions'));
+  const partners = order.filter(n => n !== featName).slice(0, 3);
+  const bivRow = el('div');
+  bivRow.style.display = 'grid';
+  bivRow.style.gridTemplateColumns = 'repeat(3, 1fr)';
+  bivRow.style.gap = '12px';
+  bivRow.style.marginBottom = '14px';
+  // Responsive fallback handled by the row2 CSS on narrow viewports; here we just let it wrap
+  if (window.innerWidth < 1000) bivRow.style.gridTemplateColumns = '1fr';
+  partners.forEach((partner, i) => {
+    const bv = bivariateFR(featName, partner);
+    const card = chartCard(`${featName} × ${partner}`, 'fraud rate per (5×5) bin', `ff-plot-bv-${i}`, 260);
+    bivRow.appendChild(card.wrap);
+    const text = bv.z.map(row => row.map(v => `${(v*100).toFixed(1)}%`));
+    Plotly.newPlot(card.plot, [{
+      type: 'heatmap', z: bv.z,
+      x: ['Q1','Q2','Q3','Q4','Q5'], y: ['Q1','Q2','Q3','Q4','Q5'],
+      colorscale: 'Reds', zmin: 0,
+      text, texttemplate: '%{text}', textfont: { size: 9 },
+      showscale: i === partners.length - 1,
+      colorbar: { title: { text: 'fraud', font: {size: 10} }, thickness: 10, tickformat: '.0%' },
+      hovertemplate: `${featName} %{y}<br>${partner} %{x}<br>%{z:.1%}<extra></extra>`
+    }], baseLayout({
+      xaxis: { title: { text: partner, font: { size: 10 } } },
+      yaxis: { title: { text: featName, font: { size: 10 } }, autorange: 'reversed' },
+      margin: { t: 10, r: i === partners.length - 1 ? 60 : 10, b: 40, l: 60 }
+    }), COMMON_CFG);
+  });
+  mainEl.appendChild(bivRow);
+
+  // ---------- Quick links to section pages ----------
+  const links = el('div');
+  links.style.display = 'flex';
+  links.style.gap = '8px';
+  links.style.flexWrap = 'wrap';
+  links.style.margin = '10px 0 20px';
+  const sectionLinks = [
+    { label: 'Behavior page', path: 'behavior', q: { f: featName } },
+    ...(f.t === 'num' ? [{ label: 'PDP page', path: 'pdp', q: { f: featName } }] : []),
+    ...(f.t === 'num' ? [{ label: 'Spreads page', path: 'anomalies/spreads', q: { f: featName } }] : []),
+    ...(f.t === 'cat' ? [{ label: 'Categorical page', path: 'categorical', q: { f: featName } }] : []),
+    { label: 'See in AUC heatmap', path: 'time-drift/auc' },
+  ];
+  links.innerHTML = `<span style="font-size:12px;color:var(--dim);align-self:center;margin-right:4px;">Jump to section views:</span>`;
+  sectionLinks.forEach(sl => {
+    const btn = el('button');
+    btn.className = 'ff-jump-link';
+    btn.style.marginLeft = '0';
+    btn.textContent = sl.label + ' →';
+    btn.onclick = () => navigate(sl.path, sl.q || {});
+    links.appendChild(btn);
+  });
+  mainEl.appendChild(links);
+}
+
+
+/* =========================================================================
+   FEATURE COMPARE — N-feature side-by-side view (up to 5)
+   ========================================================================= */
+function renderFeatureCompare(features) {
+  const meta = compareMeta(features);
+  const anchor = features[0];
+  const N = features.length;
+  const order = FEATURES_SORTED.map(x => x.n);
+  const idxA = order.indexOf(anchor);
+  const prevF = idxA > 0 ? order[idxA - 1] : null;
+  const nextF = idxA < order.length - 1 ? order[idxA + 1] : null;
+
+  // ---------- Hero ----------
+  const hero = el('div', 'ff-hero ff-hero-compare');
+  const nameHTML = meta.map((m, i) =>
+    `<span><span class="ff-side-tag ${m.tagClass}">${m.tag}</span>${m.name}</span>` +
+    (i < N - 1 ? `<span class="ff-vs">vs</span>` : '')
+  ).join(' ');
+  const typePillsHTML = meta.map(m => {
+    const bg = m.feat.t === 'num' ? '#e0e7ff' : '#fee2e2';
+    const fg = m.feat.t === 'num' ? '#3730a3' : '#991b1b';
+    return `<span class="pill" style="background:${bg};color:${fg}">${m.tag}·${m.feat.t === 'num' ? 'numeric' : 'categorical'}</span>`;
+  }).join(' ');
+  hero.innerHTML = `
+    <div class="ff-hero-main">
+      <h1 class="ff-hero-name" style="font-size:18px">${nameHTML}</h1>
+      <div class="ff-hero-meta">
+        ${typePillsHTML}
+        <span>· comparing ${N} features</span>
+      </div>
+    </div>
+    <div class="ff-hero-nav">
+      <button id="ff-prev" ${prevF ? '' : 'disabled'}>← A: ${prevF || 'Prev'}</button>
+      <span class="ff-counter">${idxA + 1} / ${order.length}</span>
+      <button id="ff-next" ${nextF ? '' : 'disabled'}>A: ${nextF || 'Next'} →</button>
+    </div>
+  `;
+  mainEl.appendChild(hero);
+  const vsParam = features.slice(1).join(',');
+  if (prevF) hero.querySelector('#ff-prev').onclick = () => navigate(`feature/${prevF}`, { vs: vsParam });
+  if (nextF) hero.querySelector('#ff-next').onclick = () => navigate(`feature/${nextF}`, { vs: vsParam });
+
+  // Control chips
+  mainEl.appendChild(compareControlBar(features));
+
+  // ---------- KPI comparison table ----------
+  function computeKPIs(name) {
+    const f = FMAP[name];
+    const dAUC = dailyAUC[name];
+    const ootAUC = dAUC.slice(OOT_DAY).reduce((a, b) => a + b, 0) / (N_DAYS - OOT_DAY);
+    const trainAUC = f.auc;
+    const ootMiss = dailyMiss[name].slice(OOT_DAY).reduce((a, b) => a + b, 0) / (N_DAYS - OOT_DAY);
+    const zPeak = anomZ[name].reduce((m, v) => Math.abs(v) > Math.abs(m) ? v : m, 0);
+    const permMean = weeklyPerm[name].reduce((a, b) => a + b, 0) / weeklyPerm[name].length;
+    return { imp: f.imp, trainAUC, ootAUC, deltaAUC: ootAUC - trainAUC, ootMiss, zPeak, permMean };
+  }
+  const kpis = features.map(computeKPIs);
+
+  const metrics = [
+    { key: 'imp',       m: 'Importance',         fmt: v => v.toFixed(3),                                   higherBetter: true  },
+    { key: 'trainAUC',  m: 'Train AUC',          fmt: v => v.toFixed(3),                                   higherBetter: true  },
+    { key: 'ootAUC',    m: 'OOT AUC',            fmt: v => v.toFixed(3),                                   higherBetter: true  },
+    { key: 'deltaAUC',  m: 'Δ AUC (Val→OOT)',    fmt: v => (v >= 0 ? '+' : '') + v.toFixed(3),             higherBetter: true  },
+    { key: 'ootMiss',   m: 'OOT missing rate',   fmt: v => (v * 100).toFixed(1) + '%',                     higherBetter: false },
+    { key: 'zPeak',     m: 'Peak |z|',           fmt: v => Math.abs(v).toFixed(1) + 'σ',                   higherBetter: false, absolute: true },
+    { key: 'permMean',  m: 'Mean permutation Δ', fmt: v => v.toFixed(4),                                   higherBetter: true  },
+  ];
+
+  const tbl = el('table', 'compare-tbl');
+  const headerCells = meta.map(m => `<th><span class="ff-side-tag ${m.tagClass}">${m.tag}</span>${m.name}</th>`).join('');
+  const rowsHTML = metrics.map(met => {
+    const values = kpis.map(k => k[met.key]);
+    const compValues = met.absolute ? values.map(Math.abs) : values;
+    const best = met.higherBetter ? Math.max(...compValues) : Math.min(...compValues);
+    const worst = met.higherBetter ? Math.min(...compValues) : Math.max(...compValues);
+    const cells = values.map((v, i) => {
+      const c = compValues[i];
+      const cls = (N > 1 && c === best) ? 'best-cell' : (N > 2 && c === worst) ? 'worst-cell' : '';
+      return `<td class="${cls}">${met.fmt(v)}</td>`;
+    }).join('');
+    return `<tr><td class="metric-name">${met.m}</td>${cells}</tr>`;
+  }).join('');
+  tbl.innerHTML = `<thead><tr><th>Metric</th>${headerCells}</tr></thead><tbody>${rowsHTML}</tbody>`;
+  mainEl.appendChild(tbl);
+
+  // ---------- Timeline at a glance — overlay N features per mini ----------
+  mainEl.appendChild(el('div', 'ff-section-hd', 'Timeline at a glance'));
+  const timeline = el('div', 'ff-timeline');
+  mainEl.appendChild(timeline);
+
+  const miniLayoutBase = (extra = {}) => baseLayout(Object.assign({
+    margin: { t: 4, r: 8, b: 14, l: 28 },
+    showlegend: false,
+    xaxis: { showgrid: false, showticklabels: false, zeroline: false },
+    yaxis: { gridcolor: '#f1f5f9', zeroline: false, tickfont: { size: 9 }, nticks: 3 },
+    shapes: [ootLineShape(DATES[OOT_DAY])],
+  }, extra));
+
+  const legendHTML = meta.map(m =>
+    `<span><span class="mini-legend-swatch" style="background:${m.color}"></span>${m.tag}</span>`
+  ).join('');
+
+  function overlayMini(title, plotId, seriesBuilder, layout) {
+    const box = el('div', 'ff-mini');
+    box.innerHTML = `<div class="ff-mini-t">${title}</div><div class="mini-legend">${legendHTML}</div>`;
+    const plot = el('div'); plot.id = plotId; plot.style.height = '110px'; plot.style.marginTop = '4px';
+    box.appendChild(plot);
+    timeline.appendChild(box);
+    Plotly.newPlot(plot, meta.map(seriesBuilder), layout, COMMON_CFG);
+  }
+
+  overlayMini('Daily AUC', 'ff-plot-cmp-auc', (m) => ({
+    type: 'scatter', mode: 'lines', x: DATES, y: dailyAUC[m.name],
+    line: { color: m.color, width: 1.4 }, name: m.tag,
+    hovertemplate: `${m.tag}: %{y:.3f}<extra></extra>`
+  }), miniLayoutBase({ yaxis: { range: [0.45, 0.92], gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 } }));
+
+  overlayMini('Missing rate', 'ff-plot-cmp-miss', (m) => ({
+    type: 'scatter', mode: 'lines', x: DATES, y: dailyMiss[m.name],
+    line: { color: m.color, width: 1.3 }, name: m.tag,
+    hovertemplate: `${m.tag}: %{y:.1%}<extra></extra>`
+  }), miniLayoutBase({ yaxis: { tickformat: '.0%', rangemode: 'tozero', gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 } }));
+
+  overlayMini('Mean drift (z)', 'ff-plot-cmp-z', (m) => ({
+    type: 'scatter', mode: 'lines', x: DATES, y: anomMean[m.name],
+    line: { color: m.color, width: 1.2 }, name: m.tag,
+    hovertemplate: `${m.tag} z=%{y:.2f}<extra></extra>`
+  }), miniLayoutBase({ yaxis: { zeroline: true, zerolinecolor: '#cbd5e1', gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 } }));
+
+  overlayMini('Permutation Δ AUC (weekly)', 'ff-plot-cmp-perm', (m) => ({
+    type: 'scatter', mode: 'lines+markers', x: WEEKS, y: weeklyPerm[m.name],
+    line: { color: m.color, width: 1.5 }, marker: { size: 3 }, name: m.tag,
+    hovertemplate: `${m.tag}: %{y:.4f}<extra></extra>`
+  }), miniLayoutBase({ yaxis: { rangemode: 'tozero', gridcolor: '#f1f5f9', tickfont: { size: 9 }, nticks: 3 }, shapes: [ootLineShape(WEEKS[OOT_WEEK])] }));
+
+  // ---------- Behavior — side-by-side, responsive grid ----------
+  mainEl.appendChild(el('div', 'ff-section-hd', `Bucket behavior — side by side (${N} features)`));
+  const behaveGrid = el('div', 'compare-grid-n');
+  mainEl.appendChild(behaveGrid);
+  meta.forEach((m, i) => {
+    const b = behavior[m.name];
+    const card = chartCard(
+      `<span class="ff-side-tag ${m.tagClass}">${m.tag}</span> ${m.name}`,
+      'Count (left) · fraud rate + mean score (right)',
+      `ff-plot-cmp-bh-${i}`, 300
+    );
+    behaveGrid.appendChild(card.wrap);
+    Plotly.newPlot(card.plot, [
+      { type: 'bar', x: b.buckets, y: b.count, name: 'Count', marker: { color: '#cbd5e1' } },
+      { type: 'scatter', mode: 'lines+markers', x: b.buckets, y: b.fraudRate, name: 'Fraud rate',
+        line: { color: m.color, width: 2.4 }, marker: { size: 5 }, yaxis: 'y2' },
+      { type: 'scatter', mode: 'lines+markers', x: b.buckets, y: b.meanScore, name: 'Mean score',
+        line: { color: m.color, width: 1.8, dash: 'dot' }, marker: { size: 4 }, yaxis: 'y2' },
+    ], baseLayout({
+      xaxis: { title: m.feat.t === 'num' ? 'Quantile bucket' : 'Category', tickangle: m.feat.t === 'cat' ? -30 : 0, tickfont: { size: 10 } },
+      yaxis: { title: 'Count', gridcolor: '#f1f5f9' },
+      yaxis2: { title: 'Rate / score', overlaying: 'y', side: 'right', rangemode: 'tozero' },
+      showlegend: false,
+      margin: { t: 14, r: 50, b: 54, l: 50 }
+    }), COMMON_CFG);
+  });
+
+  // ---------- Relationship section ----------
+  mainEl.appendChild(el('div', 'ff-section-hd', 'Relationship with target'));
+  const allNumeric = meta.every(m => m.feat.t === 'num');
+
+  if (allNumeric) {
+    // Overlay all PDPs
+    const pdpCard = chartCard('Partial dependence — overlay', 'p(fraud) vs. feature value (each scaled 0–1)', 'ff-plot-cmp-pdp', 330);
+    mainEl.appendChild(pdpCard.wrap);
+    const pdpTraces = meta.map(m => {
+      const p = pdp[m.name];
+      return {
+        type: 'scatter', mode: 'lines', x: p.xs, y: p.ys,
+        name: `${m.tag}: ${m.name}`,
+        line: { color: m.color, width: 2.4 },
+        hovertemplate: `${m.tag} x=%{x:.2f}<br>p̂=%{y:.3f}<extra></extra>`
+      };
+    });
+    Plotly.newPlot(pdpCard.plot, pdpTraces, baseLayout({
+      xaxis: { title: 'feature value (scaled 0–1)', gridcolor: '#f1f5f9' },
+      yaxis: { title: 'avg p̂', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+      legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center' },
+      margin: { t: 14, r: 16, b: 50, l: 50 }
+    }), COMMON_CFG);
+
+    // Spreads grid
+    const spreadGrid = el('div', 'compare-grid-n');
+    mainEl.appendChild(spreadGrid);
+    meta.forEach((m, i) => {
+      const s = spreads[m.name];
+      const card = chartCard(
+        `<span class="ff-side-tag ${m.tagClass}">${m.tag}</span> Spread · ${m.name}`,
+        'IQR band + mean, daily',
+        `ff-plot-cmp-sp-${i}`, 260
+      );
+      spreadGrid.appendChild(card.wrap);
+      Plotly.newPlot(card.plot, [
+        { type: 'scatter', x: DATES, y: s.q1, mode: 'lines', line: { width: 0 }, showlegend: false, hoverinfo: 'skip' },
+        { type: 'scatter', x: DATES, y: s.q3, mode: 'lines', fill: 'tonexty', fillcolor: m.color + '30',
+          line: { width: 0 }, name: 'IQR', hoverinfo: 'skip' },
+        { type: 'scatter', x: DATES, y: s.mean, mode: 'lines', name: 'mean', line: { color: m.color, width: 1.8 },
+          hovertemplate: '%{x}<br>mean: %{y:.1f}<extra></extra>' },
+      ], baseLayout({
+        xaxis: { nticks: 6, showgrid: false, tickfont: { size: 9 } },
+        yaxis: { gridcolor: '#f1f5f9', tickfont: { size: 9 } },
+        showlegend: false,
+        shapes: [ootLineShape(DATES[OOT_DAY])],
+        margin: { t: 14, r: 16, b: 36, l: 44 }
+      }), COMMON_CFG);
+    });
+  } else {
+    // Mixed types — each feature gets the panel that fits it
+    const detailGrid = el('div', 'compare-grid-n');
+    mainEl.appendChild(detailGrid);
+    meta.forEach((m, i) => {
+      if (m.feat.t === 'num') {
+        const p = pdp[m.name];
+        const card = chartCard(
+          `<span class="ff-side-tag ${m.tagClass}">${m.tag}</span> PDP · ${m.name}`,
+          `baseline p̂ = ${p.baseline.toFixed(3)}`,
+          `ff-plot-cmp-rel-${i}`, 260
+        );
+        detailGrid.appendChild(card.wrap);
+        Plotly.newPlot(card.plot, [{
+          type: 'scatter', mode: 'lines', x: p.xs, y: p.ys,
+          line: { color: m.color, width: 2.4 },
+          hovertemplate: 'x=%{x:.2f}<br>p̂=%{y:.3f}<extra></extra>'
+        }], baseLayout({
+          xaxis: { title: 'scaled 0–1', gridcolor: '#f1f5f9', tickfont: { size: 9 } },
+          yaxis: { title: 'avg p̂', gridcolor: '#f1f5f9', rangemode: 'tozero', tickfont: { size: 9 } },
+          showlegend: false,
+          margin: { t: 14, r: 16, b: 40, l: 44 }
+        }), COMMON_CFG);
+      } else {
+        const palette = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#ec4899','#14b8a6','#64748b'];
+        const shares = catShares[m.name];
+        const traces = m.feat.cats.map((cat, k) => ({
+          type: 'scatter', mode: 'lines', x: DATES, y: shares[k],
+          stackgroup: 'one', name: cat,
+          line: { width: 0.5, color: palette[k % palette.length] },
+          fillcolor: palette[k % palette.length],
+          hovertemplate: `${cat}: %{y:.1%}<extra></extra>`
+        }));
+        const card = chartCard(
+          `<span class="ff-side-tag ${m.tagClass}">${m.tag}</span> Category shares · ${m.name}`,
+          `${m.feat.cats.length} categories · stacked`,
+          `ff-plot-cmp-rel-${i}`, 260
+        );
+        detailGrid.appendChild(card.wrap);
+        Plotly.newPlot(card.plot, traces, baseLayout({
+          xaxis: { nticks: 6, showgrid: false, showticklabels: false },
+          yaxis: { range: [0, 1], tickformat: '.0%', tickfont: { size: 9 } },
+          legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center', font: { size: 8 } },
+          shapes: [ootLineShape(DATES[OOT_DAY])],
+          margin: { t: 14, r: 16, b: 30, l: 44 }
+        }), COMMON_CFG);
+      }
+    });
+  }
+
+  // ---------- Pair interactions (A × each other feature) ----------
+  if (N > 1) {
+    mainEl.appendChild(el('div', 'ff-section-hd', `Pair interactions: ${anchor} × each other`));
+    const pairGrid = el('div', 'compare-grid-n');
+    mainEl.appendChild(pairGrid);
+    meta.slice(1).forEach((m, i) => {
+      const bv = bivariateFR(anchor, m.name);
+      const card = chartCard(
+        `<span class="ff-side-tag ff-side-a">A</span> ${anchor} × <span class="ff-side-tag ${m.tagClass}">${m.tag}</span> ${m.name}`,
+        'Fraud rate per (5×5) bin',
+        `ff-plot-cmp-bv-${i}`, 300
+      );
+      pairGrid.appendChild(card.wrap);
+      const text = bv.z.map(row => row.map(v => `${(v*100).toFixed(1)}%`));
+      Plotly.newPlot(card.plot, [{
+        type: 'heatmap', z: bv.z,
+        x: ['Q1','Q2','Q3','Q4','Q5'], y: ['Q1','Q2','Q3','Q4','Q5'],
+        colorscale: 'Reds', zmin: 0,
+        text, texttemplate: '%{text}', textfont: { size: 9 },
+        showscale: false,
+        hovertemplate: `${anchor} %{y}<br>${m.name} %{x}<br>%{z:.1%}<extra></extra>`
+      }], baseLayout({
+        xaxis: { title: { text: m.name, font: { size: 10 } } },
+        yaxis: { title: { text: anchor, font: { size: 10 } }, autorange: 'reversed' },
+        margin: { t: 14, r: 10, b: 40, l: 50 }
+      }), COMMON_CFG);
+    });
+  }
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+searchEl.addEventListener('input', e => renderNav(e.target.value));
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  // Don't trigger when typing in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  // '/' focuses search
+  if (e.key === '/') { e.preventDefault(); searchEl.focus(); return; }
+  // j/k or arrow keys: prev/next feature on focus page
+  const parts = currentPath.split('/');
+  if (parts[0] === 'feature' && parts[1]) {
+    const order = FEATURES_SORTED.map(x => x.n);
+    const idx = order.indexOf(parts[1]);
+    if ((e.key === 'j' || e.key === 'ArrowRight') && idx < order.length - 1) {
+      e.preventDefault(); navigate(`feature/${order[idx + 1]}`);
+    } else if ((e.key === 'k' || e.key === 'ArrowLeft') && idx > 0) {
+      e.preventDefault(); navigate(`feature/${order[idx - 1]}`);
+    }
+  }
+});
+
+renderNav();
+updateFooter();
+const initial = (location.hash.replace(/^#\/?/, '') || 'overview').split('?');
+currentPath = initial[0] || 'overview';
+const initParams = Object.fromEntries(new URLSearchParams(initial[1] || ''));
+renderCrumbs();
+updateActive();
+render(initParams);
+</script>
+</body>
+</html>

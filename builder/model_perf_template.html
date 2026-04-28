@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Performance Hub · Fraud Demo v1</title>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>:root {
+  --sb-bg: #0f172a;
+  --sb-bg-2: #1e293b;
+  --sb-fg: #cbd5e1;
+  --sb-dim: #64748b;
+  --accent: #6366f1;
+  --accent-bg: rgba(99,102,241,0.16);
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --border: #e4e7ec;
+  --text: #0f172a;
+  --dim: #64748b;
+  --good: #10b981;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  color: var(--text); background: var(--bg);
+  font-size: 14px; display: flex; overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 280px; background: var(--sb-bg); color: var(--sb-fg);
+  flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+.sb-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--sb-bg-2); }
+.sb-title { font-size: 15px; font-weight: 700; color: #f1f5f9; margin: 0; display: flex; align-items: center; gap: 8px; }
+.sb-title::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); display: inline-block; }
+.sb-sub { font-size: 11px; color: var(--sb-dim); margin-top: 4px; letter-spacing: 0.4px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.sb-hublink {
+  display: block; font-size: 11px; color: var(--sb-dim);
+  padding: 8px 20px; text-decoration: none;
+  border-bottom: 1px solid var(--sb-bg-2);
+}
+.sb-hublink:hover { color: var(--accent); }
+.sb-hublink .arrow { float: right; }
+.sb-search { padding: 10px 14px; border-bottom: 1px solid var(--sb-bg-2); }
+.sb-search input {
+  width: 100%; background: var(--sb-bg-2); border: 1px solid #334155;
+  color: #f1f5f9; padding: 7px 10px; border-radius: 5px; font-size: 12px; outline: none;
+}
+.sb-search input:focus { border-color: var(--accent); }
+.sb-search input::placeholder { color: var(--sb-dim); }
+.nav { flex: 1; overflow-y: auto; padding: 6px 0 10px; }
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.nav-section { margin-bottom: 1px; }
+.nav-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px 9px 18px; cursor: pointer; user-select: none;
+  font-size: 12.5px; font-weight: 600; color: #e2e8f0;
+}
+.nav-head:hover { background: rgba(255,255,255,0.04); }
+.nav-head .chev { margin-left: auto; color: var(--sb-dim); font-size: 9px; transition: transform 0.15s; }
+.nav-section.collapsed .chev { transform: rotate(-90deg); }
+.nav-section.collapsed .nav-items { display: none; }
+.nav-items { padding: 2px 0 6px; }
+.nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 18px 6px 42px; cursor: pointer;
+  font-size: 12.5px; color: var(--sb-fg);
+  border-left: 2px solid transparent;
+}
+.nav-item:hover { background: rgba(255,255,255,0.04); color: #f1f5f9; }
+.nav-item.active { color: #f1f5f9; background: var(--accent-bg); border-left-color: var(--accent); font-weight: 500; }
+.nav-direct {
+  padding: 9px 18px; cursor: pointer;
+  font-size: 12.5px; color: #e2e8f0; font-weight: 600;
+  border-left: 2px solid transparent;
+  display: flex; gap: 10px; align-items: center;
+}
+.nav-direct:hover { background: rgba(255,255,255,0.04); }
+.nav-direct.active { background: var(--accent-bg); border-left-color: var(--accent); }
+.badge {
+  font-size: 10px; padding: 1px 7px; border-radius: 10px;
+  background: #334155; color: #cbd5e1; margin-left: auto; font-weight: 500;
+}
+.badge-accent { background: var(--accent-bg); color: #c7d2fe; }
+.badge-warn { background: #78350f; color: #fcd34d; }
+.badge-bad  { background: #7f1d1d; color: #fca5a5; }
+.sb-foot { padding: 12px 18px; border-top: 1px solid var(--sb-bg-2); font-size: 11px; color: var(--sb-dim); }
+
+/* Feature list in sidebar - sparklines */
+.nav-items-feat .nav-item {
+  padding: 5px 12px 5px 30px;
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 8px; align-items: center;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11.5px;
+}
+.nav-items-feat .nav-item span:first-child {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.nav-spark { opacity: 0.85; flex-shrink: 0; }
+.nav-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; background: #475569; }
+.nav-dot.warn { background: var(--warn); }
+.nav-dot.bad  { background: var(--bad); }
+.nav-dot.good { background: var(--good); }
+
+/* Content */
+.content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  height: 56px; background: var(--card);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 24px; gap: 16px;
+  flex-shrink: 0;
+}
+.crumbs { font-size: 13px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+.crumbs strong { color: var(--text); font-weight: 600; }
+.crumbs .sep { color: #cbd5e1; }
+.tr { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--dim); }
+.tstat { display: flex; gap: 5px; align-items: center; }
+.tstat strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tstat-sep { color: #cbd5e1; }
+.main { flex: 1; overflow-y: auto; padding: 22px 24px; }
+.main::-webkit-scrollbar { width: 8px; }
+.main::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+.page-h { margin-bottom: 18px; }
+.page-t { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.page-d { font-size: 13px; color: var(--dim); margin: 0; max-width: 820px; line-height: 1.5; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+.controls {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 10px 14px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+}
+.ctl { display: flex; align-items: center; gap: 8px; }
+.ctl label { font-size: 11px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.4px; }
+.ctl select, .ctl input[type=text] {
+  font-size: 13px; padding: 5px 28px 5px 10px;
+  border: 1px solid var(--border); border-radius: 5px;
+  background: white; outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' fill='none'/></svg>");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.ctl-radio { display: flex; gap: 4px; }
+.ctl-radio label {
+  cursor: pointer; padding: 5px 10px; background: #f1f5f9;
+  border-radius: 5px; font-size: 12px; color: var(--text);
+  text-transform: none; letter-spacing: 0; font-weight: 500;
+  border: 1px solid transparent;
+}
+.ctl-radio label:hover { background: #e2e8f0; }
+.ctl-radio label.active { background: #1e293b; color: white; border-color: #1e293b; }
+.ctl-radio input { display: none; }
+.ctl button {
+  font-size: 12px; padding: 5px 10px;
+  border: 1px solid var(--border); border-radius: 5px;
+  background: white; cursor: pointer; color: var(--text);
+}
+.ctl button:hover:not(:disabled) { background: #f1f5f9; }
+.ctl button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.slider-box { flex: 1; min-width: 280px; display: flex; align-items: center; gap: 12px; }
+.slider-box input[type=range] {
+  flex: 1; height: 6px; -webkit-appearance: none; appearance: none;
+  background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--val), #e2e8f0 var(--val), #e2e8f0 100%);
+  border-radius: 3px; outline: none;
+}
+.slider-box input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px;
+  background: white; border: 3px solid var(--accent); border-radius: 50%;
+  cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+.slider-box .slider-val {
+  min-width: 58px; text-align: center; background: #1e293b; color: white;
+  padding: 5px 10px; border-radius: 5px; font-weight: 700;
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+.kpis.kpis-6 { grid-template-columns: repeat(6, 1fr); }
+@media (max-width: 1400px) { .kpis.kpis-6 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px)  { .kpis.kpis-6 { grid-template-columns: repeat(2, 1fr); } }
+.kpi { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 13px 16px; }
+.kpi-l { font-size: 11px; color: var(--dim); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px; }
+.kpi-v { font-size: 22px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.kpi-s { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+.kpi-accent { border-left: 3px solid var(--accent); }
+.kpi-warn   { border-left: 3px solid var(--warn); }
+.kpi-bad    { border-left: 3px solid var(--bad); }
+.kpi-good   { border-left: 3px solid var(--good); }
+
+.chart-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; margin-bottom: 14px; }
+.chart-head { padding: 10px 14px 2px; }
+.chart-t { font-size: 13.5px; font-weight: 600; margin: 0; }
+.chart-s { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.chart-body { padding: 4px; }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.compare-grid-n { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 14px; }
+@media (max-width: 1100px) { .row2, .row3 { grid-template-columns: 1fr; } }
+
+.rt-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rt-tbl th {
+  text-align: left; font-size: 11px; text-transform: uppercase;
+  color: var(--dim); font-weight: 600;
+  padding: 10px 12px; border-bottom: 1px solid var(--border); letter-spacing: 0.4px;
+  background: #f8fafc;
+}
+.rt-tbl td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
+.rt-tbl tr:last-child td { border-bottom: 0; }
+.rt-tbl .hl { background: #eef2ff; font-weight: 600; }
+.rt-tbl .split-col { background: #f8fafc; font-weight: 500; color: var(--text); }
+
+.alert {
+  display: flex; gap: 10px; padding: 10px 12px;
+  border-left: 3px solid var(--warn); background: #fffbeb;
+  border-radius: 4px; margin-bottom: 6px; font-size: 13px;
+}
+.alert.bad  { border-left-color: var(--bad); background: #fef2f2; }
+.alert.good { border-left-color: var(--good); background: #f0fdf4; }
+.alert strong { margin-right: 4px; }
+.alert code { background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+.sec-title { font-size: 13px; font-weight: 600; margin: 4px 0 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--dim); }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.pill-good   { background: #d1fae5; color: #065f46; }
+.pill-warn   { background: #fef3c7; color: #92400e; }
+.pill-bad    { background: #fee2e2; color: #991b1b; }
+.pill-accent { background: #e0e7ff; color: #3730a3; }
+
+.metric-row {
+  display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px;
+  padding: 10px 14px; background: #f8fafc; border: 1px solid var(--border);
+  border-radius: 6px; margin-bottom: 10px;
+}
+.metric-row .mr-i { display: flex; gap: 6px; padding-right: 16px; border-right: 1px solid var(--border); }
+.metric-row .mr-i:last-child { border-right: 0; }
+.metric-row .mr-l { color: var(--dim); font-weight: 500; }
+.metric-row .mr-v { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.fcode {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.92em; color: var(--accent); cursor: pointer;
+  border-bottom: 1px dashed transparent;
+}
+.fcode:hover { border-bottom-color: var(--accent); }
+
+/* Feature focus hero (feature hub) */
+.ff-hero {
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 60%);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 22px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+}
+.ff-hero-main { flex: 1; min-width: 260px; }
+.ff-hero-name {
+  font-size: 26px; font-weight: 700; margin: 0;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: -0.5px;
+}
+.ff-hero-meta {
+  margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: center; font-size: 13px; color: var(--dim);
+}
+.ff-hero-nav { display: flex; gap: 6px; align-items: center; }
+.ff-hero-nav button {
+  font-size: 12px; padding: 6px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: white; cursor: pointer; color: var(--text);
+}
+.ff-hero-nav button:hover:not(:disabled) { background: #f1f5f9; border-color: var(--accent); color: var(--accent); }
+.ff-hero-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+.ff-hero-nav .ff-counter { font-size: 11px; color: var(--dim); margin: 0 6px; font-variant-numeric: tabular-nums; }
+
+.ff-timeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 1100px) { .ff-timeline { grid-template-columns: repeat(2, 1fr); } }
+.ff-mini {
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px 4px;
+}
+.ff-mini-t { font-size: 11px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; }
+.ff-mini-v { font-size: 16px; font-weight: 700; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.ff-mini-s { font-size: 10.5px; color: var(--dim); }
+
+.ff-section-hd {
+  font-size: 12px; font-weight: 700; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 18px 0 8px; padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.ff-section-hd:first-of-type { border-top: 0; padding-top: 0; margin-top: 6px; }
+
+.ff-jump-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--accent);
+  text-decoration: none; padding: 4px 10px;
+  border: 1px solid var(--accent); border-radius: 14px;
+  background: white; cursor: pointer; margin-left: auto;
+}
+.ff-jump-link:hover { background: var(--accent); color: white; }
+
+@media (max-width: 720px) {
+  .sidebar { width: 240px; }
+  .tr { display: none; }
+}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-head">
+    <div class="sb-title">Model Performance</div>
+    <div class="sb-sub" id="sb-sub"></div>
+  </div>
+<a class="sb-hublink" href="./feature_analysis_hub_real.html">Feature Analysis Hub <span class="arrow">→</span></a>
+<a class="sb-hublink" href="./stability_monitoring_hub_real.html">Stability &amp; Calibration Hub <span class="arrow">→</span></a>
+  <div class="sb-search">
+    <input type="text" id="search" placeholder="Search sections…" autocomplete="off">
+  </div>
+  <nav class="nav" id="nav"></nav>
+  <div class="sb-foot" id="sb-foot"></div>
+</aside>
+
+<div class="content">
+  <div class="topbar">
+    <div class="crumbs" id="crumbs"></div>
+    <div class="tr" id="topstats"></div>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+window.DATA = __DATA_JSON__;
+window.DATA_READY = Promise.resolve(window.DATA);
+</script>
+<script>/* ============================================================================
+   Shared hub infrastructure: router, nav, plot helpers.
+   Each hub defines:
+     - window.HUB_NAV        (nav tree)
+     - window.HUB_ROUTES     ({path: render_fn})
+     - window.HUB_ONREADY    (() => void)  called after payload loads
+   And calls HUB_init() at the end of its specific JS file.
+   ============================================================================ */
+
+// Namespace to avoid leaking into global scope
+window.HUB = (function () {
+  const COMMON_FONT = { family: 'Inter, -apple-system, Segoe UI, Roboto, sans-serif', size: 11, color: '#334155' };
+  const COMMON_CFG = { responsive: true, displayModeBar: false };
+  const SPLIT_COLORS = { train: '#64748b', val: '#0ea5e9', oot: '#7c3aed' };
+
+  // ---------- DOM helpers ----------
+  const navEl = () => document.getElementById('nav');
+  const mainEl = () => document.getElementById('main');
+  const crumbsEl = () => document.getElementById('crumbs');
+  const footEl = () => document.getElementById('sb-foot');
+  const searchEl = () => document.getElementById('search');
+  const subEl = () => document.getElementById('sb-sub');
+  const topEl = () => document.getElementById('topstats');
+
+  function el(tag, cls, html) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+
+  function pageHeader(title, desc) {
+    const h = el('div', 'page-h');
+    h.innerHTML = `<h1 class="page-t">${title}</h1>${desc ? `<p class="page-d">${desc}</p>` : ''}`;
+    return h;
+  }
+
+  function chartCard(title, sub, id, height) {
+    const wrap = el('div', 'chart-wrap');
+    const head = el('div', 'chart-head');
+    head.innerHTML = `<div class="chart-t">${title}</div>${sub ? `<div class="chart-s">${sub}</div>` : ''}`;
+    const body = el('div', 'chart-body');
+    const plot = el('div');
+    plot.id = id;
+    plot.style.height = (height || 380) + 'px';
+    body.appendChild(plot);
+    wrap.appendChild(head); wrap.appendChild(body);
+    return { wrap, plot };
+  }
+
+  function baseLayout(extra = {}) {
+    return Object.assign({
+      margin: { t: 24, r: 20, b: 46, l: 60 },
+      font: COMMON_FONT,
+      paper_bgcolor: 'white',
+      plot_bgcolor: 'white',
+    }, extra);
+  }
+
+  function ootLineShape(xVal) {
+    return { type: 'line', xref: 'x', yref: 'paper', x0: xVal, x1: xVal, y0: 0, y1: 1,
+             line: { color: '#ef4444', width: 1.4, dash: 'dash' } };
+  }
+  function ootAnnotation(xVal, label = 'OOT start') {
+    return { xref: 'x', yref: 'paper', x: xVal, y: 1.02, text: label, showarrow: false,
+             font: { color: '#ef4444', size: 10 }, xanchor: 'left' };
+  }
+
+  // ---------- Formatting ----------
+  const fmtPct = (v, d = 1) => (v == null || isNaN(v)) ? '—' : (v * 100).toFixed(d) + '%';
+  const fmt = (v, d = 3) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(d);
+
+  // ---------- State + router ----------
+  const state = {
+    currentPath: '',
+    params: {},
+  };
+
+  function navigate(path, params = {}) {
+    mainEl().querySelectorAll('[id^="plot-"], [id^="ff-plot-"]').forEach(el => {
+      try { Plotly.purge(el); } catch (e) {}
+    });
+    state.currentPath = path;
+    state.params = params;
+    const qs = new URLSearchParams(params).toString();
+    location.hash = '#/' + path + (qs ? '?' + qs : '');
+    renderCrumbs();
+    updateActive();
+    render(params);
+  }
+
+  function render(params = {}) {
+    const routes = window.HUB_ROUTES || {};
+    // Pre-render hook: hubs can register window.HUB_PRE_RENDER to intercept
+    // dynamic paths (e.g. feature/<name>) before the normal route dispatch.
+    if (typeof window.HUB_PRE_RENDER === 'function') {
+      const handled = window.HUB_PRE_RENDER(state.currentPath, params);
+      if (handled) return;
+    }
+    const fn = routes[state.currentPath] || routes[state.currentPath.split('/')[0]];
+    mainEl().innerHTML = '';
+    if (fn) fn(params);
+    else {
+      // Fall back to first available route
+      const fallback = Object.keys(routes)[0];
+      if (fallback) { state.currentPath = fallback; routes[fallback](params); }
+    }
+  }
+
+  // ---------- Nav rendering ----------
+  const collapsedSections = new Set();
+
+  function renderNav(filter = '') {
+    const nav = window.HUB_NAV || [];
+    navEl().innerHTML = '';
+    const q = filter.trim().toLowerCase();
+    nav.forEach(sec => {
+      if (sec.kind === 'direct') {
+        if (q && !sec.title.toLowerCase().includes(q)) return;
+        const e = document.createElement('div');
+        e.className = 'nav-direct';
+        e.dataset.path = sec.id;
+        e.innerHTML = `<span>${sec.title}</span>${sec.badge ? `<span class="badge ${sec.badgeKind ? 'badge-' + sec.badgeKind : ''}">${sec.badge}</span>` : ''}`;
+        e.onclick = () => navigate(sec.id);
+        navEl().appendChild(e);
+      } else {
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'nav-section';
+        if (collapsedSections.has(sec.id) || (sec.collapsedByDefault && !q && !collapsedSections.has(sec.id))) {
+          sectionEl.classList.add('collapsed');
+          if (sec.collapsedByDefault) collapsedSections.add(sec.id);
+        }
+        const head = document.createElement('div');
+        head.className = 'nav-head';
+        head.innerHTML = `<span>${sec.title}</span>${sec.badge ? `<span class="badge ${sec.badgeKind ? 'badge-' + sec.badgeKind : ''}">${sec.badge}</span>` : ''}<span class="chev">▼</span>`;
+        head.onclick = () => {
+          if (collapsedSections.has(sec.id)) collapsedSections.delete(sec.id);
+          else collapsedSections.add(sec.id);
+          sectionEl.classList.toggle('collapsed');
+        };
+        sectionEl.appendChild(head);
+        const items = document.createElement('div');
+        items.className = sec.childrenKind === 'feat' ? 'nav-items nav-items-feat' : 'nav-items';
+        let hasMatch = false;
+        (sec.children || []).forEach(sub => {
+          if (q && !sub.title.toLowerCase().includes(q) && !sec.title.toLowerCase().includes(q)) return;
+          hasMatch = true;
+          const item = document.createElement('div');
+          item.className = 'nav-item';
+          const path = sub.path || `${sec.id}/${sub.id}`;
+          item.dataset.path = path;
+          if (sub.sparkline) {
+            const spark = sparklineSVG(sub.sparkline, {
+              width: 42, height: 12, min: 0.45, max: 0.85,
+              color: sub.dot === 'bad' ? '#ef4444' : sub.dot === 'warn' ? '#f59e0b' : '#94a3b8'
+            });
+            item.innerHTML = `<span>${sub.title}</span>${spark}<span class="nav-dot ${sub.dot || ''}"></span>`;
+          } else {
+            item.innerHTML = `<span>${sub.title}</span>${sub.badge ? `<span class="badge">${sub.badge}</span>` : ''}`;
+          }
+          item.onclick = () => navigate(path);
+          items.appendChild(item);
+        });
+        sectionEl.appendChild(items);
+        if (q && !hasMatch && !sec.title.toLowerCase().includes(q)) return;
+        if (q) sectionEl.classList.remove('collapsed');
+        navEl().appendChild(sectionEl);
+      }
+    });
+    updateActive();
+  }
+
+  function updateActive() {
+    document.querySelectorAll('.nav-item, .nav-direct').forEach(e => {
+      e.classList.toggle('active', e.dataset.path === state.currentPath);
+    });
+  }
+
+  function renderCrumbs() {
+    const parts = state.currentPath.split('/');
+    const nav = window.HUB_NAV || [];
+    const hubTitle = window.HUB_TITLE || 'Hub';
+    let crumbs = [`<strong>${hubTitle}</strong>`];
+    // Custom crumb override (e.g. feature focus page)
+    if (window.HUB_CUSTOM_CRUMBS) {
+      const custom = window.HUB_CUSTOM_CRUMBS(parts);
+      if (custom) { crumbsEl().innerHTML = `<strong>${hubTitle}</strong> ` + custom; return; }
+    }
+    if (parts[0]) {
+      const sec = nav.find(s => s.id === parts[0]);
+      crumbs.push(`<span class="sep">›</span>`);
+      crumbs.push(parts[1] ? `<span>${sec?.title || parts[0]}</span>` : `<strong>${sec?.title || parts[0]}</strong>`);
+      if (parts[1]) {
+        const sub = sec?.children?.find(c => c.id === parts[1]);
+        crumbs.push(`<span class="sep">›</span>`);
+        crumbs.push(`<strong>${sub?.title || parts[1]}</strong>`);
+      }
+    }
+    crumbsEl().innerHTML = crumbs.join(' ');
+  }
+
+  // ---------- Sparkline (for sidebar and small decorations) ----------
+  function sparklineSVG(values, opts = {}) {
+    if (!values || !values.length) return '';
+    const w = opts.width || 48, h = opts.height || 14;
+    const vals = values.filter(v => v != null);
+    if (!vals.length) return '';
+    const min = opts.min != null ? opts.min : Math.min(...vals);
+    const max = opts.max != null ? opts.max : Math.max(...vals);
+    const range = Math.max(max - min, 1e-6);
+    const pts = values.map((v, i) => {
+      if (v == null) return null;
+      const x = (i / Math.max(values.length - 1, 1)) * (w - 2) + 1;
+      const y = h - 1 - ((v - min) / range) * (h - 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).filter(Boolean).join(' ');
+    return `<svg class="nav-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <polyline points="${pts}" fill="none" stroke="${opts.color || '#94a3b8'}" stroke-width="1.2" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  // ---------- Init ----------
+  function init() {
+    window.DATA_READY.then(data => {
+      if (!data) {
+        mainEl().innerHTML = '<div style="padding:40px;color:var(--dim)">No payload loaded.</div>';
+        return;
+      }
+      // Schema version check
+      const expected = window.HUB_EXPECTED_SCHEMA || '1.0';
+      if (data.schema_version && data.schema_version.split('.')[0] !== expected.split('.')[0]) {
+        mainEl().innerHTML = `<div style="padding:40px;color:var(--bad)">Schema version mismatch (got ${data.schema_version}, expected ${expected}). Please regenerate this report.</div>`;
+        return;
+      }
+      // Hand off to the hub-specific setup
+      if (window.HUB_ONREADY) window.HUB_ONREADY(data);
+
+      // Wire up search
+      searchEl().addEventListener('input', e => renderNav(e.target.value));
+      window.addEventListener('hashchange', () => {
+        const h = location.hash.replace(/^#\/?/, '');
+        const [p, qs] = h.split('?');
+        const params = Object.fromEntries(new URLSearchParams(qs || ''));
+        if (p !== state.currentPath) {
+          state.currentPath = p || (Object.keys(window.HUB_ROUTES)[0] || 'overview');
+          state.params = params;
+          renderCrumbs(); updateActive(); render(params);
+        }
+      });
+      // Initial route
+      renderNav();
+      const initial = (location.hash.replace(/^#\/?/, '') || (Object.keys(window.HUB_ROUTES)[0] || 'overview')).split('?');
+      state.currentPath = initial[0];
+      state.params = Object.fromEntries(new URLSearchParams(initial[1] || ''));
+      renderCrumbs(); updateActive(); render(state.params);
+    }).catch(err => {
+      mainEl().innerHTML = `<div style="padding:40px;color:var(--bad)">Failed to load payload: ${err}</div>`;
+      console.error(err);
+    });
+  }
+
+  // Exposed API
+  return {
+    // state
+    state,
+    // constants
+    COMMON_FONT, COMMON_CFG, SPLIT_COLORS,
+    // DOM
+    el, pageHeader, chartCard,
+    mainEl, subEl, topEl, footEl,
+    // plot helpers
+    baseLayout, ootLineShape, ootAnnotation, sparklineSVG,
+    // formatting
+    fmtPct, fmt,
+    // routing
+    navigate, render, renderNav, renderCrumbs, updateActive,
+    // lifecycle
+    init,
+  };
+})();
+</script>
+<script>/* ============================================================================
+   Model Performance Hub — routes that read from window.DATA.
+   Payload shape (see schema.py):
+     DATA = {
+       schema_version, run_id, run_timestamp, model_name, champion_id,
+       cohort_dims: [...],
+       feature_importance: [{name, gain, weight, cover}, ...],
+       models: {
+         <model_id>: {
+           id, name, color,
+           splits: {
+             <split_name>: {
+               name, n, fraud, fraud_rate,
+               roc: {fpr, tpr, auc},
+               pr: {recall, precision, auprc, baseline},
+               calibration: {bins:[{pred,actual,count}], brier, ece},
+               lift_gains: {rows, baseline},
+               score_hist: {edges, fraud, legit},
+               daily: [{date, n, fraud, fraud_rate, auc, fcr, precision, alerts, mean_score}],
+               by_depth: {"<depth>": {tp, fp, alerts, fcr, precision, gf, score_threshold}},
+               daily_by_depth: {"<depth>": [{date, tp, fp, alerts, fcr, precision, fraud_rate}]},
+               cohorts: {<cohort_col>: {<value>: {n, fraud, auc, fcr_at_depth, ...}}},
+             }
+           }
+         }
+       },
+       sweep, hp_search, shap, extras
+     }
+   ============================================================================ */
+
+window.HUB_TITLE = 'Model Hub';
+window.HUB_EXPECTED_SCHEMA = '1.0';
+
+(function () {
+  const H = window.HUB;
+  const { el, pageHeader, chartCard, baseLayout, ootLineShape, ootAnnotation,
+          fmtPct, fmt, SPLIT_COLORS, COMMON_CFG, navigate, mainEl } = H;
+
+  // UI state (not in URL — lightweight session state)
+  const state = { model: null, split: 'oot', riskPct: 2 };
+
+  // ---------- Nav ----------
+  window.HUB_NAV = [
+    { id: 'overview', title: 'Overview', kind: 'direct' },
+    { id: 'curves', title: 'Performance curves', children: [
+      { id: 'roc-pr',     title: 'ROC / PR' },
+      { id: 'score-dist', title: 'Score distributions' },
+    ]},
+    { id: 'calibration', title: 'Calibration', kind: 'direct' },
+    { id: 'risk-depth',  title: 'Risk depth analysis', badge: 'live', badgeKind: 'accent',
+      children: [
+        { id: 'threshold', title: 'Threshold explorer' },
+        { id: 'lift',      title: 'Lift & gains' },
+        { id: 'table',     title: 'Risk score table' },
+      ]},
+    { id: 'daily',   title: 'Daily stability',      kind: 'direct' },
+    { id: 'importance', title: 'Feature importance', children: [
+      { id: 'gwc',  title: 'Gain / Weight / Cover' },
+      { id: 'shap', title: 'SHAP' },
+    ]},
+    { id: 'compare', title: 'Model comparison', kind: 'direct' },
+    { id: 'cohorts', title: 'Cohorts',          kind: 'direct' },
+    { id: 'training', title: 'Training artifacts', children: [
+      { id: 'sweep', title: 'Feature count sweep' },
+      { id: 'hp',    title: 'HP search' },
+    ]},
+    { id: 'ops', title: 'Operating thresholds', kind: 'direct' },
+  ];
+
+  // ---------- Post-data-load setup ----------
+  window.HUB_ONREADY = (data) => {
+    state.model = data.champion_id || Object.keys(data.models)[0];
+
+    // Topbar stats
+    const champion = data.models[state.model];
+    const splitStats = Object.entries(champion.splits).map(([name, s]) => ({
+      name, auc: s.roc.auc, auprc: s.pr.auprc,
+    }));
+    H.topEl().innerHTML = splitStats.map((s, i) => `
+      ${i > 0 ? '<span class="tstat-sep">·</span>' : ''}
+      <div class="tstat"><span>${s.name.toUpperCase()}</span>
+        <strong>AUC ${s.auc.toFixed(3)}</strong> /
+        <strong>AUPRC ${s.auprc.toFixed(3)}</strong></div>
+    `).join('');
+
+    H.subEl().textContent = `${data.model_name || ''} · run ${String(data.run_timestamp).slice(0, 10)}`;
+    H.footEl().innerHTML = `${Object.keys(data.models).length} models · ${Object.keys(champion.splits).length} splits<br>champion: <strong style="color:#c7d2fe">${champion.name}</strong>`;
+  };
+
+  // ---------- Shared controls ----------
+  function modelSelector(current, onChange) {
+    const box = el('div', 'ctl');
+    const D = window.DATA;
+    box.innerHTML = `<label>Model</label><div class="ctl-radio">${
+      Object.values(D.models).map(m => `
+        <label class="${m.id === current ? 'active' : ''}" data-m="${m.id}">
+          <input type="radio" value="${m.id}" ${m.id === current ? 'checked' : ''}>${m.name}
+        </label>`).join('')
+    }</div>`;
+    box.querySelectorAll('label[data-m]').forEach(lbl => {
+      lbl.onclick = () => onChange(lbl.dataset.m);
+    });
+    return box;
+  }
+
+  function splitSelector(current, onChange) {
+    const box = el('div', 'ctl');
+    const splits = Object.keys(Object.values(window.DATA.models)[0].splits);
+    box.innerHTML = `<label>Split</label><div class="ctl-radio">${
+      splits.map(s => `
+        <label class="${s === current ? 'active' : ''}" data-s="${s}">
+          <input type="radio" value="${s}" ${s === current ? 'checked' : ''}>${s.toUpperCase()}
+        </label>`).join('')
+    }</div>`;
+    box.querySelectorAll('label[data-s]').forEach(lbl => {
+      lbl.onclick = () => onChange(lbl.dataset.s);
+    });
+    return box;
+  }
+
+  const sum = a => a.reduce((x, y) => x + y, 0);
+
+  // ===========================================================================
+  // Routes
+  // ===========================================================================
+  const R = {};
+  window.HUB_ROUTES = R;
+
+  // ---------- OVERVIEW ----------
+  R['overview'] = () => {
+    const D = window.DATA;
+    const model = D.models[state.model];
+    const oot = model.splits.oot, val = model.splits.val, train = model.splits.train;
+    mainEl().appendChild(pageHeader(
+      'Model Performance Overview',
+      `Headline metrics for the champion model (${model.name}). Drill into the left nav for curves, calibration, risk depth, daily stability, feature importance, cohorts, and training artifacts.`
+    ));
+
+    const fcr2 = oot.by_depth['0.02']?.fcr ?? 0;
+    const prec2 = oot.by_depth['0.02']?.precision ?? 0;
+    const fcr1 = oot.by_depth['0.01']?.fcr ?? 0;
+    const aucDrop = train.roc.auc - oot.roc.auc;
+
+    const kpis = el('div', 'kpis kpis-6');
+    [
+      { l: 'OOT AUC',        v: oot.roc.auc.toFixed(3), s: `train ${train.roc.auc.toFixed(3)} · Δ ${(-aucDrop).toFixed(3)}`, cls: aucDrop > 0.05 ? 'kpi-warn' : 'kpi-good' },
+      { l: 'OOT AUPRC',      v: oot.pr.auprc.toFixed(3), s: `baseline ${oot.pr.baseline.toFixed(3)} (${fmtPct(oot.pr.baseline)} fraud)`, cls: 'kpi-accent' },
+      { l: 'FCR @ 1%',       v: fmtPct(fcr1, 1), s: `${oot.by_depth['0.01']?.tp ?? 0} of ${oot.fraud} caught`, cls: '' },
+      { l: 'FCR @ 2%',       v: fmtPct(fcr2, 1), s: `${oot.by_depth['0.02']?.tp ?? 0} caught · ${oot.by_depth['0.02']?.fp ?? 0} FP`, cls: '' },
+      { l: 'Precision @ 2%', v: fmtPct(prec2, 1), s: `G:F ≈ ${oot.by_depth['0.02']?.gf?.toFixed(1) ?? '—'}`, cls: '' },
+      { l: 'Brier score',    v: oot.calibration.brier.toFixed(4), s: `ECE ${oot.calibration.ece.toFixed(4)}`, cls: '' },
+    ].forEach(k => {
+      const c = el('div', 'kpi ' + k.cls);
+      c.innerHTML = `<div class="kpi-l">${k.l}</div><div class="kpi-v">${k.v}</div><div class="kpi-s">${k.s}</div>`;
+      kpis.appendChild(c);
+    });
+    mainEl().appendChild(kpis);
+
+    // Mini ROC + PR
+    const row = el('div', 'row2');
+    const rocCard = chartCard('ROC — OOT', `AUC ${oot.roc.auc.toFixed(3)}`, 'plot-o-roc', 260);
+    row.appendChild(rocCard.wrap);
+    Plotly.newPlot(rocCard.plot, [
+      { type: 'scatter', mode: 'lines', x: oot.roc.fpr, y: oot.roc.tpr,
+        line: { color: '#7c3aed', width: 2.2 },
+        hovertemplate: 'FPR %{x:.3f}<br>TPR %{y:.3f}<extra></extra>' },
+      { type: 'scatter', mode: 'lines', x: [0,1], y: [0,1],
+        line: { color: '#cbd5e1', dash: 'dash', width: 1 }, hoverinfo: 'skip', showlegend: false },
+    ], baseLayout({
+      xaxis: { title: 'FPR', range: [0,1], gridcolor: '#f1f5f9' },
+      yaxis: { title: 'TPR', range: [0,1], gridcolor: '#f1f5f9' },
+      showlegend: false, margin: { t: 8, r: 16, b: 40, l: 46 }
+    }), COMMON_CFG);
+
+    const prCard = chartCard('PR — OOT', `AUPRC ${oot.pr.auprc.toFixed(3)} · baseline ${oot.pr.baseline.toFixed(3)}`, 'plot-o-pr', 260);
+    row.appendChild(prCard.wrap);
+    Plotly.newPlot(prCard.plot, [
+      { type: 'scatter', mode: 'lines', x: oot.pr.recall, y: oot.pr.precision,
+        line: { color: '#7c3aed', width: 2.2 },
+        hovertemplate: 'R %{x:.3f}<br>P %{y:.3f}<extra></extra>' },
+      { type: 'scatter', mode: 'lines', x: [0,1], y: [oot.pr.baseline, oot.pr.baseline],
+        line: { color: '#cbd5e1', dash: 'dash', width: 1 }, hoverinfo: 'skip', showlegend: false },
+    ], baseLayout({
+      xaxis: { title: 'Recall', range: [0,1], gridcolor: '#f1f5f9' },
+      yaxis: { title: 'Precision', range: [0,1], gridcolor: '#f1f5f9' },
+      showlegend: false, margin: { t: 8, r: 16, b: 40, l: 46 }
+    }), COMMON_CFG);
+    mainEl().appendChild(row);
+
+    // Per-split summary
+    const tblWrap = el('div', 'chart-wrap');
+    tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Split summary · ${model.name}</div></div>`;
+    const tbl = el('table', 'rt-tbl');
+    tbl.innerHTML = `
+      <thead><tr>
+        <th>Split</th><th>N</th><th>Fraud</th><th>Fraud rate</th>
+        <th>AUC</th><th>AUPRC</th>
+        <th>FCR@1%</th><th>FCR@2%</th><th>Precision@2%</th><th>G:F@2%</th>
+        <th>Brier</th><th>ECE</th>
+      </tr></thead>
+      <tbody>${Object.entries(model.splits).map(([name, sp]) => `
+        <tr>
+          <td class="split-col" style="color:${SPLIT_COLORS[name] || '#64748b'}"><strong>${name.toUpperCase()}</strong></td>
+          <td>${sp.n.toLocaleString()}</td>
+          <td>${sp.fraud.toLocaleString()}</td>
+          <td>${fmtPct(sp.fraud_rate, 2)}</td>
+          <td>${sp.roc.auc.toFixed(3)}</td>
+          <td>${sp.pr.auprc.toFixed(3)}</td>
+          <td>${fmtPct(sp.by_depth['0.01']?.fcr, 1)}</td>
+          <td>${fmtPct(sp.by_depth['0.02']?.fcr, 1)}</td>
+          <td>${fmtPct(sp.by_depth['0.02']?.precision, 1)}</td>
+          <td>${sp.by_depth['0.02']?.gf?.toFixed(1) || '—'}:1</td>
+          <td>${sp.calibration.brier.toFixed(4)}</td>
+          <td>${sp.calibration.ece.toFixed(4)}</td>
+        </tr>`).join('')}
+      </tbody>`;
+    tblWrap.appendChild(tbl);
+    mainEl().appendChild(tblWrap);
+  };
+
+  // ---------- ROC / PR ----------
+  R['curves/roc-pr'] = () => {
+    mainEl().appendChild(pageHeader(
+      'ROC and Precision–Recall curves',
+      'At a low base fraud rate, AUPRC is the primary metric — ROC AUC can look optimistic because the FPR denominator is dominated by non-fraud. Treat them as complementary.'
+    ));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render(); }));
+    mainEl().appendChild(box);
+
+    const model = window.DATA.models[state.model];
+    const row = el('div', 'row2');
+
+    const rocCard = chartCard('ROC curves', 'Overlaid: all splits', 'plot-roc', 420);
+    row.appendChild(rocCard.wrap);
+    const rocTraces = Object.entries(model.splits).map(([name, s]) => ({
+      type: 'scatter', mode: 'lines', x: s.roc.fpr, y: s.roc.tpr,
+      name: `${name.toUpperCase()} · AUC ${s.roc.auc.toFixed(3)}`,
+      line: { color: SPLIT_COLORS[name] || '#64748b', width: 2.4 },
+      hovertemplate: `${name}<br>FPR %{x:.3f}<br>TPR %{y:.3f}<extra></extra>`,
+    }));
+    rocTraces.push({ type: 'scatter', mode: 'lines', x: [0,1], y: [0,1],
+      line: { color: '#cbd5e1', dash: 'dash', width: 1 }, showlegend: false, hoverinfo: 'skip' });
+    Plotly.newPlot(rocCard.plot, rocTraces, baseLayout({
+      xaxis: { title: 'FPR', range: [0,1], gridcolor: '#f1f5f9' },
+      yaxis: { title: 'TPR', range: [0,1], gridcolor: '#f1f5f9' },
+      legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center' },
+    }), COMMON_CFG);
+
+    const prCard = chartCard('Precision–Recall curves', 'Dashed line = class prevalence (random baseline)', 'plot-pr', 420);
+    row.appendChild(prCard.wrap);
+    const prTraces = Object.entries(model.splits).map(([name, s]) => ({
+      type: 'scatter', mode: 'lines', x: s.pr.recall, y: s.pr.precision,
+      name: `${name.toUpperCase()} · AUPRC ${s.pr.auprc.toFixed(3)}`,
+      line: { color: SPLIT_COLORS[name] || '#64748b', width: 2.4 },
+      hovertemplate: `${name}<br>R %{x:.3f}<br>P %{y:.3f}<extra></extra>`,
+    }));
+    const ootBaseline = model.splits.oot?.pr?.baseline ?? 0.02;
+    prTraces.push({ type: 'scatter', mode: 'lines', x: [0,1], y: [ootBaseline, ootBaseline],
+      line: { color: '#cbd5e1', dash: 'dash', width: 1 }, showlegend: false, hoverinfo: 'skip' });
+    Plotly.newPlot(prCard.plot, prTraces, baseLayout({
+      xaxis: { title: 'Recall', range: [0,1], gridcolor: '#f1f5f9' },
+      yaxis: { title: 'Precision', range: [0,1], gridcolor: '#f1f5f9' },
+      legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center' },
+    }), COMMON_CFG);
+    mainEl().appendChild(row);
+  };
+
+  // ---------- Score distributions ----------
+  R['curves/score-dist'] = () => {
+    mainEl().appendChild(pageHeader(
+      'Score distributions',
+      'Density of model scores stratified by label. Separation between the two curves is what the model gets right — overlap is where false positives and misses live.'
+    ));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render(); }));
+    mainEl().appendChild(box);
+
+    const model = window.DATA.models[state.model];
+    const row = el('div', 'row3');
+    Object.entries(model.splits).forEach(([name, s]) => {
+      const card = chartCard(name.toUpperCase(), `${s.n.toLocaleString()} tx · ${s.fraud.toLocaleString()} fraud`, `plot-sd-${name}`, 300);
+      row.appendChild(card.wrap);
+      const totL = sum(s.score_hist.legit) || 1, totF = sum(s.score_hist.fraud) || 1;
+      Plotly.newPlot(card.plot, [
+        { type: 'bar', x: s.score_hist.edges, y: s.score_hist.legit.map(v => v / totL),
+          name: 'legit', marker: { color: '#94a3b8' }, opacity: 0.7,
+          hovertemplate: 'score %{x:.2f}<br>legit %{y:.3f}<extra></extra>' },
+        { type: 'bar', x: s.score_hist.edges, y: s.score_hist.fraud.map(v => v / totF),
+          name: 'fraud', marker: { color: '#ef4444' }, opacity: 0.75,
+          hovertemplate: 'score %{x:.2f}<br>fraud %{y:.3f}<extra></extra>' },
+      ], baseLayout({
+        barmode: 'overlay', bargap: 0,
+        xaxis: { title: 'score', range: [0,1], gridcolor: '#f1f5f9' },
+        yaxis: { title: 'density (within-class)', gridcolor: '#f1f5f9' },
+        legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center' },
+        margin: { t: 10, r: 14, b: 44, l: 54 },
+      }), COMMON_CFG);
+    });
+    mainEl().appendChild(row);
+  };
+
+  // ---------- Calibration ----------
+  R['calibration'] = () => {
+    mainEl().appendChild(pageHeader(
+      'Calibration diagnostics',
+      'Reliability diagrams for each split, plus Brier / ECE summary.'
+    ));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render(); }));
+    mainEl().appendChild(box);
+
+    const model = window.DATA.models[state.model];
+    const row = el('div', 'row3');
+    Object.entries(model.splits).forEach(([name, s]) => {
+      const card = chartCard(`${name.toUpperCase()} reliability`, `Brier ${s.calibration.brier.toFixed(4)} · ECE ${s.calibration.ece.toFixed(4)}`, `plot-cal-${name}`, 320);
+      row.appendChild(card.wrap);
+      Plotly.newPlot(card.plot, [
+        { type: 'scatter', mode: 'lines+markers',
+          x: s.calibration.bins.map(b => b.pred), y: s.calibration.bins.map(b => b.actual),
+          line: { color: SPLIT_COLORS[name] || '#64748b', width: 2.4 }, marker: { size: 7 },
+          hovertemplate: 'pred %{x:.3f}<br>actual %{y:.3f}<extra></extra>' },
+        { type: 'scatter', mode: 'lines', x: [0,1], y: [0,1],
+          line: { color: '#cbd5e1', dash: 'dash', width: 1 }, hoverinfo: 'skip' },
+      ], baseLayout({
+        xaxis: { title: 'mean predicted', range: [0,1], gridcolor: '#f1f5f9' },
+        yaxis: { title: 'actual fraud rate', range: [0,1], gridcolor: '#f1f5f9' },
+        showlegend: false, margin: { t: 10, r: 14, b: 44, l: 54 },
+      }), COMMON_CFG);
+    });
+    mainEl().appendChild(row);
+  };
+
+  // ---------- Threshold explorer ----------
+  R['risk-depth/threshold'] = () => {
+    mainEl().appendChild(pageHeader(
+      'Threshold explorer',
+      'Adjust the top risk % threshold to see the TP/FP composition of daily alerts across splits. The fraud-rate line overlays the true class prevalence for that day.'
+    ));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render(); }));
+    const sliderCtl = el('div', 'slider-box');
+    // Only depths precomputed in daily_by_depth are slidable; interpolate between them otherwise
+    const allDepths = Object.keys(window.DATA.models[state.model].splits.oot.daily_by_depth || {})
+      .map(parseFloat).sort((a, b) => a - b);
+    const depthChoices = allDepths.length ? allDepths : [0.01, 0.02, 0.03, 0.05, 0.10];
+    const minIdx = 0, maxIdx = depthChoices.length - 1;
+    const initIdx = Math.max(0, depthChoices.indexOf(state.riskPct / 100));
+    sliderCtl.innerHTML = `
+      <label style="font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:0.4px;">Top risk %</label>
+      <input type="range" id="riskSlider" min="${minIdx}" max="${maxIdx}" step="1" value="${initIdx}">
+      <div class="slider-val" id="riskVal">${(depthChoices[initIdx] * 100).toFixed(1)}%</div>
+    `;
+    box.appendChild(sliderCtl);
+    mainEl().appendChild(box);
+
+    function fillSlider(idx) {
+      const pct = (idx / Math.max(maxIdx, 1)) * 100;
+      sliderCtl.querySelector('#riskSlider').style.setProperty('--val', pct + '%');
+    }
+    fillSlider(initIdx);
+    state.riskPct = depthChoices[initIdx] * 100;
+
+    const kpiHost = el('div', 'kpis'); mainEl().appendChild(kpiHost);
+
+    const splits = Object.keys(window.DATA.models[state.model].splits);
+    const barsRow = el('div', 'row3');
+    splits.forEach(name => {
+      const c = chartCard(`<b>${name.toUpperCase()}</b>`, '', `plot-thr-${name}`, 320);
+      barsRow.appendChild(c.wrap);
+    });
+    mainEl().appendChild(barsRow);
+
+    const fcrCard = chartCard('FCR over time', '', 'plot-thr-fcr', 280);
+    mainEl().appendChild(fcrCard.wrap);
+    const row2 = el('div', 'row2');
+    const precCard = chartCard('Precision over time', '', 'plot-thr-prec', 260);
+    const volCard = chartCard('Alert volume', '', 'plot-thr-vol', 260);
+    row2.appendChild(precCard.wrap); row2.appendChild(volCard.wrap);
+    mainEl().appendChild(row2);
+
+    function draw() {
+      const depth = state.riskPct / 100;
+      const depthKey = `${depth}`;
+      const model = window.DATA.models[state.model];
+
+      // KPIs: overall at the depth for each split
+      const kpiCards = splits.map(name => {
+        const s = model.splits[name];
+        const m = s.by_depth[depthKey] ||
+                  s.by_depth[Object.keys(s.by_depth).find(k => Math.abs(+k - depth) < 1e-6)];
+        return m ? {
+          l: `${name.toUpperCase()} · FCR @ ${(depth*100).toFixed(1)}%`,
+          v: fmtPct(m.fcr, 1),
+          s: `${m.tp} TP · ${m.fp} FP · Prec ${fmtPct(m.precision, 1)}`,
+          cls: name === 'oot' && m.fcr < 0.4 ? 'kpi-warn' : '',
+        } : null;
+      }).filter(Boolean);
+      // add OOT alert volume
+      const ootM = model.splits.oot?.by_depth?.[depthKey];
+      const ootDays = model.splits.oot?.daily?.length || 1;
+      if (ootM) kpiCards.push({
+        l: 'OOT alerts / day', v: Math.round(ootM.alerts / ootDays).toLocaleString(),
+        s: `≈ ${ootM.alerts.toLocaleString()} total · G:F ${ootM.gf?.toFixed(1) ?? '—'}:1`,
+        cls: 'kpi-accent',
+      });
+      kpiHost.innerHTML = kpiCards.map(k =>
+        `<div class="kpi ${k.cls}"><div class="kpi-l">${k.l}</div><div class="kpi-v">${k.v}</div><div class="kpi-s">${k.s}</div></div>`
+      ).join('');
+
+      // Stacked bars per split
+      splits.forEach(name => {
+        const rows = model.splits[name].daily_by_depth[depthKey] || [];
+        const dates = rows.map(r => r.date);
+        Plotly.react(`plot-thr-${name}`, [
+          { type: 'bar', x: dates, y: rows.map(r => r.tp), name: 'TP',
+            marker: { color: '#10b981' }, hovertemplate: 'TP %{y}<extra></extra>' },
+          { type: 'bar', x: dates, y: rows.map(r => r.fp), name: 'FP',
+            marker: { color: '#f87171' }, hovertemplate: 'FP %{y}<extra></extra>' },
+          { type: 'scatter', mode: 'lines', x: dates, y: rows.map(r => r.fraud_rate * 100),
+            name: 'fraud rate', yaxis: 'y2', line: { color: '#7c3aed', width: 1.8 },
+            hovertemplate: 'rate %{y:.2f}%<extra></extra>' },
+        ], baseLayout({
+          barmode: 'stack',
+          margin: { t: 8, r: 46, b: 46, l: 46 },
+          xaxis: { tickformat: '%b %d', showgrid: false, nticks: 8 },
+          yaxis: { title: 'daily alerts', gridcolor: '#f1f5f9' },
+          yaxis2: { title: 'fraud %', overlaying: 'y', side: 'right', rangemode: 'tozero',
+                    showgrid: false, tickfont: { color: '#7c3aed' } },
+          legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center', font: { size: 10 } },
+        }), COMMON_CFG);
+      });
+
+      // FCR, precision, alert volume over time
+      const fcrTraces = splits.map(name => ({
+        type: 'scatter', mode: 'lines',
+        x: (model.splits[name].daily_by_depth[depthKey] || []).map(r => r.date),
+        y: (model.splits[name].daily_by_depth[depthKey] || []).map(r => r.fcr * 100),
+        name: name.toUpperCase(), line: { color: SPLIT_COLORS[name] || '#64748b', width: 2 },
+      }));
+      Plotly.react('plot-thr-fcr', fcrTraces, baseLayout({
+        xaxis: { tickformat: '%b %d', showgrid: false },
+        yaxis: { title: 'FCR (%)', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+        legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center' },
+        margin: { t: 10, r: 16, b: 44, l: 54 },
+      }), COMMON_CFG);
+      Plotly.react('plot-thr-prec', splits.map(name => ({
+        type: 'scatter', mode: 'lines',
+        x: (model.splits[name].daily_by_depth[depthKey] || []).map(r => r.date),
+        y: (model.splits[name].daily_by_depth[depthKey] || []).map(r => r.precision * 100),
+        name: name.toUpperCase(), line: { color: SPLIT_COLORS[name] || '#64748b', width: 2 },
+      })), baseLayout({
+        xaxis: { tickformat: '%b %d', showgrid: false },
+        yaxis: { title: 'Precision (%)', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+        legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center', font: { size: 10 } },
+        margin: { t: 10, r: 16, b: 46, l: 54 },
+      }), COMMON_CFG);
+      Plotly.react('plot-thr-vol', splits.map(name => ({
+        type: 'scatter', mode: 'lines',
+        x: (model.splits[name].daily_by_depth[depthKey] || []).map(r => r.date),
+        y: (model.splits[name].daily_by_depth[depthKey] || []).map(r => r.alerts),
+        name: name.toUpperCase(), line: { color: SPLIT_COLORS[name] || '#64748b', width: 2 },
+      })), baseLayout({
+        xaxis: { tickformat: '%b %d', showgrid: false },
+        yaxis: { title: 'alerts / day', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+        legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center', font: { size: 10 } },
+        margin: { t: 10, r: 16, b: 46, l: 54 },
+      }), COMMON_CFG);
+    }
+
+    sliderCtl.querySelector('#riskSlider').addEventListener('input', e => {
+      const idx = parseInt(e.target.value);
+      state.riskPct = depthChoices[idx] * 100;
+      sliderCtl.querySelector('#riskVal').textContent = (depthChoices[idx] * 100).toFixed(1) + '%';
+      fillSlider(idx);
+      draw();
+    });
+    draw();
+  };
+
+  // ---------- Lift & gains ----------
+  R['risk-depth/lift'] = () => {
+    mainEl().appendChild(pageHeader(
+      'Lift and cumulative gains',
+      'Deciles sorted by score. "Lift" = fraud rate in that decile / overall rate.'
+    ));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render(); }));
+    box.appendChild(splitSelector(state.split, s => { state.split = s; H.render(); }));
+    mainEl().appendChild(box);
+    const split = window.DATA.models[state.model].splits[state.split];
+    const lg = split.lift_gains;
+    const row = el('div', 'row2');
+
+    const liftCard = chartCard('Lift by decile', `baseline fraud rate ${fmtPct(lg.baseline, 2)}`, 'plot-lift', 320);
+    row.appendChild(liftCard.wrap);
+    Plotly.newPlot(liftCard.plot, [
+      { type: 'scatter', mode: 'lines+markers',
+        x: lg.rows.map(r => r.decile), y: lg.rows.map(r => r.lift),
+        line: { color: '#6366f1', width: 2.4 }, marker: { size: 8 },
+        hovertemplate: 'decile %{x}<br>lift %{y:.2f}x<extra></extra>' },
+      { type: 'scatter', mode: 'lines', x: [1, 10], y: [1, 1],
+        line: { color: '#cbd5e1', dash: 'dash' }, hoverinfo: 'skip' },
+    ], baseLayout({
+      xaxis: { title: 'decile', dtick: 1, gridcolor: '#f1f5f9' },
+      yaxis: { title: 'lift', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+      showlegend: false,
+    }), COMMON_CFG);
+
+    const gainsCard = chartCard('Cumulative gains', 'fraction of fraud captured', 'plot-gains', 320);
+    row.appendChild(gainsCard.wrap);
+    Plotly.newPlot(gainsCard.plot, [
+      { type: 'scatter', mode: 'lines+markers',
+        x: [0, ...lg.rows.map(r => r.pct_population)],
+        y: [0, ...lg.rows.map(r => r.cum_fraud_captured)],
+        line: { color: '#10b981', width: 2.4 }, marker: { size: 7 },
+        hovertemplate: 'top %{x:.0%}<br>captured %{y:.1%}<extra></extra>' },
+      { type: 'scatter', mode: 'lines', x: [0,1], y: [0,1],
+        line: { color: '#cbd5e1', dash: 'dash' }, hoverinfo: 'skip' },
+    ], baseLayout({
+      xaxis: { title: '% population', tickformat: '.0%', range: [0, 1], gridcolor: '#f1f5f9' },
+      yaxis: { title: '% fraud captured', tickformat: '.0%', range: [0, 1], gridcolor: '#f1f5f9' },
+      showlegend: false,
+    }), COMMON_CFG);
+    mainEl().appendChild(row);
+
+    // Decile table
+    const tblWrap = el('div', 'chart-wrap');
+    tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Decile table</div></div>`;
+    const tbl = el('table', 'rt-tbl');
+    tbl.innerHTML = `
+      <thead><tr><th>Decile</th><th>% pop</th><th>Fraud rate</th><th>Lift</th><th>Cumulative</th></tr></thead>
+      <tbody>${lg.rows.map(r => `<tr>
+        <td><strong>${r.decile}</strong></td>
+        <td>${fmtPct(r.pct_population, 0)}</td>
+        <td>${fmtPct(r.fraud_rate, 2)}</td>
+        <td>${r.lift?.toFixed(2) ?? '—'}×</td>
+        <td>${fmtPct(r.cum_fraud_captured, 1)}</td>
+      </tr>`).join('')}</tbody>`;
+    tblWrap.appendChild(tbl);
+    mainEl().appendChild(tblWrap);
+  };
+
+  // ---------- Risk score table ----------
+  R['risk-depth/table'] = () => {
+    mainEl().appendChild(pageHeader(
+      'Risk score table',
+      'FCR and G:F at standard operating depths for each split.'
+    ));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render(); }));
+    mainEl().appendChild(box);
+
+    const model = window.DATA.models[state.model];
+    Object.entries(model.splits).forEach(([name, s]) => {
+      const card = el('div', 'chart-wrap');
+      card.innerHTML = `<div class="chart-head">
+        <div class="chart-t" style="color:${SPLIT_COLORS[name] || '#64748b'}">${name.toUpperCase()}</div>
+        <div class="chart-s">${s.n.toLocaleString()} rows · ${s.fraud.toLocaleString()} fraud · AUC ${s.roc.auc.toFixed(3)}</div>
+      </div>`;
+      const base = s.fraud_rate;
+      const depths = Object.keys(s.by_depth).map(parseFloat).sort((a,b) => a - b);
+      const tbl = el('table', 'rt-tbl');
+      tbl.innerHTML = `
+        <thead><tr>
+          <th>Depth</th><th>Alerts</th><th>TP</th><th>FP</th>
+          <th>FCR</th><th>Precision</th><th>G:F</th><th>Lift</th>
+        </tr></thead>
+        <tbody>${depths.map(d => {
+          const m = s.by_depth[`${d}`];
+          const lift = base > 0 ? m.precision / base : 0;
+          const isCommon = Math.abs(d - 0.02) < 1e-6;
+          return `<tr class="${isCommon ? 'hl' : ''}">
+            <td><strong>Top ${(d*100).toFixed(d < 0.01 ? 1 : 1)}%</strong></td>
+            <td>${m.alerts.toLocaleString()}</td>
+            <td>${m.tp}</td>
+            <td>${m.fp}</td>
+            <td>${fmtPct(m.fcr, 1)}</td>
+            <td>${fmtPct(m.precision, 1)}</td>
+            <td>${m.gf?.toFixed(1) ?? '—'}:1</td>
+            <td>${lift.toFixed(1)}×</td>
+          </tr>`;
+        }).join('')}</tbody>`;
+      card.appendChild(tbl);
+      mainEl().appendChild(card);
+    });
+  };
+
+  // ---------- Daily stability ----------
+  R['daily'] = () => {
+    mainEl().appendChild(pageHeader(
+      'Daily stability',
+      'Per-day metrics across splits. Divergence is where monitoring should focus.'
+    ));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render(); }));
+    mainEl().appendChild(box);
+    const model = window.DATA.models[state.model];
+    const plotDaily = (id, title, sub, accessor, fmtY) => {
+      const card = chartCard(title, sub, id, 240);
+      mainEl().appendChild(card.wrap);
+      Plotly.newPlot(card.plot, Object.entries(model.splits).map(([name, s]) => ({
+        type: 'scatter', mode: 'lines', name: name.toUpperCase(),
+        x: s.daily.map(r => r.date), y: s.daily.map(accessor),
+        line: { color: SPLIT_COLORS[name] || '#64748b', width: 1.8 },
+        hovertemplate: `${name}<br>%{x}<br>${title}: %{y${fmtY || ''}}<extra></extra>`,
+      })), baseLayout({
+        xaxis: { tickformat: '%b %d', showgrid: false, nticks: 12 },
+        yaxis: { gridcolor: '#f1f5f9', rangemode: 'tozero' },
+        legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center', font: { size: 10 } },
+        margin: { t: 14, r: 16, b: 46, l: 54 },
+      }), COMMON_CFG);
+    };
+    plotDaily('plot-d-auc', 'Daily AUC', 'Univariate AUC per day',                 r => r.auc,        ':.3f');
+    plotDaily('plot-d-fr',  'Daily fraud rate', 'Empirical fraud share',           r => r.fraud_rate * 100, ':.2f');
+    plotDaily('plot-d-fcr', 'Daily FCR @ 2%', 'Capture at the 2% operating depth', r => r.fcr * 100,  ':.1f');
+    plotDaily('plot-d-sc',  'Daily mean score', 'Average predicted probability',   r => r.mean_score, ':.3f');
+  };
+
+  // ---------- Feature importance GWC ----------
+  R['importance/gwc'] = () => {
+    mainEl().appendChild(pageHeader(
+      'Feature importance — gain, weight, cover',
+      'Three XGBoost importance views. Gain is the primary ranking.'
+    ));
+    const imp = window.DATA.feature_importance || [];
+    if (!imp.length) {
+      mainEl().innerHTML += '<div class="card" style="padding:14px">No feature importance provided.</div>';
+      return;
+    }
+    const topN = Math.min(15, imp.length);
+    const byGain = [...imp].sort((a, b) => (b.gain || 0) - (a.gain || 0)).slice(0, topN);
+    const byWeight = [...imp].filter(f => f.weight != null).sort((a, b) => b.weight - a.weight).slice(0, topN);
+    const byCover = [...imp].filter(f => f.cover != null).sort((a, b) => b.cover - a.cover).slice(0, topN);
+
+    const row = el('div', 'row3');
+    function bar(id, title, data, key, color) {
+      const c = chartCard(title, `top ${data.length}`, id, 420);
+      row.appendChild(c.wrap);
+      Plotly.newPlot(c.plot, [{
+        type: 'bar', orientation: 'h',
+        x: data.map(d => d[key]), y: data.map(d => d.name),
+        marker: { color },
+        hovertemplate: `<b>%{y}</b><br>${key}: %{x}<extra></extra>`,
+      }], baseLayout({
+        xaxis: { title: key, gridcolor: '#f1f5f9' },
+        yaxis: { automargin: true, autorange: 'reversed' },
+        margin: { t: 10, r: 14, b: 44, l: 120 },
+      }), COMMON_CFG);
+    }
+    bar('plot-gain', 'Gain', byGain, 'gain', '#6366f1');
+    if (byWeight.length) bar('plot-weight', 'Weight', byWeight, 'weight', '#10b981');
+    if (byCover.length)  bar('plot-cover', 'Cover',  byCover,  'cover',  '#f59e0b');
+    mainEl().appendChild(row);
+
+    // Full table
+    const tblWrap = el('div', 'chart-wrap');
+    tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">All features by importance</div></div>`;
+    const tbl = el('table', 'rt-tbl');
+    tbl.innerHTML = `
+      <thead><tr><th>Rank</th><th>Feature</th><th>Gain</th><th>Weight</th><th>Cover</th></tr></thead>
+      <tbody>${[...imp].sort((a, b) => (b.gain || 0) - (a.gain || 0)).map((f, i) => `
+        <tr><td>${i+1}</td><td><strong>${f.name}</strong></td>
+          <td>${f.gain?.toFixed(4) ?? '—'}</td>
+          <td>${f.weight?.toLocaleString?.() ?? '—'}</td>
+          <td>${f.cover?.toFixed(4) ?? '—'}</td></tr>`).join('')}
+      </tbody>`;
+    tblWrap.appendChild(tbl);
+    mainEl().appendChild(tblWrap);
+  };
+
+  // ---------- SHAP ----------
+  R['importance/shap'] = (params) => {
+    mainEl().appendChild(pageHeader('SHAP importance', 'SHAP summary beeswarm + per-feature dependence.'));
+    const shap = window.DATA.shap;
+    if (!shap || !shap.features) {
+      mainEl().innerHTML += '<div class="card" style="padding:14px">No SHAP values provided. Compute them and include them in `extras.shap` or the `shap` field.</div>';
+      return;
+    }
+    // Summary beeswarm: one strip per feature, color = feature value
+    const card = chartCard('SHAP summary', `${shap.features.length} features · ${shap.n_samples ?? shap.shap_values[shap.features[0]]?.length ?? 0} samples`, 'plot-shap', 460);
+    mainEl().appendChild(card.wrap);
+    const traces = shap.features.map((fn, i) => ({
+      type: 'scatter', mode: 'markers',
+      x: shap.shap_values[fn], y: shap.shap_values[fn].map(() => i + (Math.random() - 0.5) * 0.6),
+      marker: {
+        color: shap.feature_values[fn], colorscale: 'RdBu', reversescale: true, cmin: 0, cmax: 1,
+        size: 5, opacity: 0.6, line: { width: 0 },
+        colorbar: i === 0 ? { title: { text: 'feat val', font: { size: 11 } }, thickness: 10, x: 1.02 } : undefined,
+        showscale: i === 0,
+      },
+      name: fn, showlegend: false,
+      hovertemplate: `${fn}<br>SHAP %{x:.3f}<extra></extra>`,
+    }));
+    Plotly.newPlot(card.plot, traces, baseLayout({
+      xaxis: { title: 'SHAP (log-odds impact)', zeroline: true, zerolinecolor: '#cbd5e1', gridcolor: '#f1f5f9' },
+      yaxis: { tickmode: 'array', tickvals: shap.features.map((_, i) => i), ticktext: shap.features, autorange: 'reversed' },
+      margin: { t: 10, r: 80, b: 44, l: 140 },
+    }), COMMON_CFG);
+
+    // Dependence picker
+    const feat = (params.f && shap.features.includes(params.f)) ? params.f : shap.features[0];
+    const depBox = el('div', 'controls');
+    depBox.innerHTML = `<div class="ctl"><label>Feature</label>
+      <select id="shap-feat">${shap.features.map(f => `<option value="${f}" ${f===feat?'selected':''}>${f}</option>`).join('')}</select>
+    </div>`;
+    depBox.querySelector('#shap-feat').onchange = e => H.navigate('importance/shap', { f: e.target.value });
+    mainEl().appendChild(depBox);
+
+    const depCard = chartCard(`SHAP dependence · ${feat}`, '', 'plot-shap-dep', 340);
+    mainEl().appendChild(depCard.wrap);
+    Plotly.newPlot(depCard.plot, [{
+      type: 'scatter', mode: 'markers',
+      x: shap.feature_values[feat], y: shap.shap_values[feat],
+      marker: { color: '#6366f1', size: 6, opacity: 0.55 },
+      hovertemplate: 'feat: %{x:.3f}<br>SHAP: %{y:.3f}<extra></extra>',
+    }], baseLayout({
+      xaxis: { title: feat, gridcolor: '#f1f5f9' },
+      yaxis: { title: 'SHAP', gridcolor: '#f1f5f9', zeroline: true, zerolinecolor: '#cbd5e1' },
+      showlegend: false,
+      margin: { t: 10, r: 14, b: 44, l: 54 },
+    }), COMMON_CFG);
+  };
+
+  // ---------- Model comparison ----------
+  R['compare'] = () => {
+    mainEl().appendChild(pageHeader('Model comparison', 'Champion vs challengers.'));
+    const box = el('div', 'controls');
+    box.appendChild(splitSelector(state.split, s => { state.split = s; H.render(); }));
+    mainEl().appendChild(box);
+    const split = state.split;
+    const models = Object.values(window.DATA.models);
+    const row = el('div', 'row2');
+
+    const rocCard = chartCard(`ROC · ${split.toUpperCase()}`, 'all models', 'plot-cmp-roc', 360);
+    row.appendChild(rocCard.wrap);
+    Plotly.newPlot(rocCard.plot, [
+      ...models.map(m => {
+        const r = m.splits[split].roc;
+        return { type: 'scatter', mode: 'lines', x: r.fpr, y: r.tpr,
+          name: `${m.name} · AUC ${r.auc.toFixed(3)}`, line: { color: m.color, width: 2.2 } };
+      }),
+      { type: 'scatter', mode: 'lines', x: [0,1], y: [0,1],
+        line: { color: '#cbd5e1', dash: 'dash', width: 1 }, showlegend: false, hoverinfo: 'skip' },
+    ], baseLayout({
+      xaxis: { title: 'FPR', range: [0,1], gridcolor: '#f1f5f9' },
+      yaxis: { title: 'TPR', range: [0,1], gridcolor: '#f1f5f9' },
+      legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center', font: { size: 10 } },
+    }), COMMON_CFG);
+
+    const prCard = chartCard(`PR · ${split.toUpperCase()}`, 'all models', 'plot-cmp-pr', 360);
+    row.appendChild(prCard.wrap);
+    Plotly.newPlot(prCard.plot, [
+      ...models.map(m => {
+        const p = m.splits[split].pr;
+        return { type: 'scatter', mode: 'lines', x: p.recall, y: p.precision,
+          name: `${m.name} · AUPRC ${p.auprc.toFixed(3)}`, line: { color: m.color, width: 2.2 } };
+      }),
+    ], baseLayout({
+      xaxis: { title: 'Recall', range: [0,1], gridcolor: '#f1f5f9' },
+      yaxis: { title: 'Precision', range: [0,1], gridcolor: '#f1f5f9' },
+      legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center', font: { size: 10 } },
+    }), COMMON_CFG);
+    mainEl().appendChild(row);
+
+    // Full table
+    const tblWrap = el('div', 'chart-wrap');
+    tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Full metric table</div></div>`;
+    const tbl = el('table', 'rt-tbl');
+    const splits = Object.keys(models[0].splits);
+    tbl.innerHTML = `
+      <thead><tr><th>Model</th><th>Split</th><th>AUC</th><th>AUPRC</th>
+        <th>FCR@1%</th><th>FCR@2%</th><th>Precision@2%</th><th>Brier</th></tr></thead>
+      <tbody>${models.flatMap(m => splits.map(s => {
+        const sp = m.splits[s];
+        return `<tr>
+          <td><span class="pill pill-accent" style="background:${m.color}22;color:${m.color}">${m.id}</span></td>
+          <td class="split-col" style="color:${SPLIT_COLORS[s] || '#64748b'}">${s.toUpperCase()}</td>
+          <td>${sp.roc.auc.toFixed(3)}</td>
+          <td>${sp.pr.auprc.toFixed(3)}</td>
+          <td>${fmtPct(sp.by_depth['0.01']?.fcr, 1)}</td>
+          <td>${fmtPct(sp.by_depth['0.02']?.fcr, 1)}</td>
+          <td>${fmtPct(sp.by_depth['0.02']?.precision, 1)}</td>
+          <td>${sp.calibration.brier.toFixed(4)}</td>
+        </tr>`;
+      })).join('')}</tbody>`;
+    tblWrap.appendChild(tbl);
+    mainEl().appendChild(tblWrap);
+  };
+
+  // ---------- Cohorts ----------
+  R['cohorts'] = (params) => {
+    const D = window.DATA;
+    const dim = params.dim && D.cohort_dims.includes(params.dim) ? params.dim : (D.cohort_dims[0] || '');
+    mainEl().appendChild(pageHeader('Cohort slicing', 'Performance broken out by segment.'));
+    const box = el('div', 'controls');
+    box.appendChild(modelSelector(state.model, m => { state.model = m; H.render({ dim }); }));
+    box.innerHTML += `<div class="ctl"><label>Segment</label>
+      <select id="cohort-dim">${D.cohort_dims.map(k => `<option value="${k}" ${k===dim?'selected':''}>${k}</option>`).join('')}</select>
+    </div>`;
+    mainEl().appendChild(box);
+    box.querySelector('#cohort-dim').onchange = e => H.navigate('cohorts', { dim: e.target.value });
+    if (!dim) return;
+
+    const model = D.models[state.model];
+    // Collect all cohort values seen across splits
+    const allValues = new Set();
+    Object.values(model.splits).forEach(s => Object.keys(s.cohorts[dim] || {}).forEach(v => allValues.add(v)));
+    const cats = [...allValues];
+
+    const fcrCard = chartCard(`FCR @ 2% by ${dim}`, 'per split', 'plot-cohort-fcr', 340);
+    mainEl().appendChild(fcrCard.wrap);
+    Plotly.newPlot(fcrCard.plot, Object.entries(model.splits).map(([name, s]) => ({
+      type: 'bar', name: name.toUpperCase(), x: cats,
+      marker: { color: SPLIT_COLORS[name] || '#64748b' },
+      y: cats.map(c => (s.cohorts[dim]?.[c]?.fcr_at_depth ?? null) * 100),
+      hovertemplate: `${name}<br>%{x}<br>FCR %{y:.1f}%<extra></extra>`,
+    })), baseLayout({
+      barmode: 'group',
+      xaxis: { title: dim, showgrid: false },
+      yaxis: { title: 'FCR @ 2% (%)', gridcolor: '#f1f5f9', rangemode: 'tozero' },
+      legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center' },
+    }), COMMON_CFG);
+
+    // Table
+    const tblWrap = el('div', 'chart-wrap');
+    tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Cohort table</div><div class="chart-s">${dim}</div></div>`;
+    const tbl = el('table', 'rt-tbl');
+    tbl.innerHTML = `
+      <thead><tr><th>${dim}</th><th>Split</th><th>N</th><th>Fraud</th><th>Fraud rate</th>
+        <th>AUC</th><th>FCR @ 2%</th><th>Precision @ 2%</th></tr></thead>
+      <tbody>${cats.flatMap(c => Object.entries(model.splits).map(([name, s]) => {
+        const m = s.cohorts[dim]?.[c]; if (!m) return '';
+        return `<tr>
+          <td><strong>${c}</strong></td>
+          <td class="split-col" style="color:${SPLIT_COLORS[name] || '#64748b'}">${name.toUpperCase()}</td>
+          <td>${m.n.toLocaleString()}</td>
+          <td>${m.fraud}</td>
+          <td>${fmtPct(m.fraud_rate, 2)}</td>
+          <td>${m.auc?.toFixed(3) ?? '—'}</td>
+          <td>${fmtPct(m.fcr_at_depth, 1)}</td>
+          <td>${fmtPct(m.precision_at_depth, 1)}</td>
+        </tr>`;
+      })).join('')}</tbody>`;
+    tblWrap.appendChild(tbl);
+    mainEl().appendChild(tblWrap);
+  };
+
+  // ---------- Training sweep + HP ----------
+  R['training/sweep'] = () => {
+    mainEl().appendChild(pageHeader('Feature count sweep', 'Performance vs. number of features.'));
+    const sweep = window.DATA.sweep || [];
+    if (!sweep.length) return mainEl().innerHTML += '<div class="card" style="padding:14px">No sweep data provided.</div>';
+    const card = chartCard('Feature count vs. performance', 'val metrics', 'plot-sweep', 400);
+    mainEl().appendChild(card.wrap);
+    Plotly.newPlot(card.plot, [
+      { type: 'scatter', mode: 'lines+markers', x: sweep.map(r => r.n), y: sweep.map(r => r.auc),
+        name: 'AUC', line: { color: '#6366f1', width: 2.4 }, marker: { size: 8 } },
+      { type: 'scatter', mode: 'lines+markers', x: sweep.map(r => r.n), y: sweep.map(r => r.auprc),
+        name: 'AUPRC', line: { color: '#10b981', width: 2.4 }, marker: { size: 8 }, yaxis: 'y2' },
+    ], baseLayout({
+      xaxis: { title: 'number of features', gridcolor: '#f1f5f9', type: 'log' },
+      yaxis: { title: 'AUC', gridcolor: '#f1f5f9' },
+      yaxis2: { title: 'AUPRC', overlaying: 'y', side: 'right' },
+      legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center' },
+    }), COMMON_CFG);
+  };
+
+  R['training/hp'] = () => {
+    mainEl().appendChild(pageHeader('Hyperparameter search', 'Each trial is one point.'));
+    const hp = window.DATA.hp_search || [];
+    if (!hp.length) return mainEl().innerHTML += '<div class="card" style="padding:14px">No HP search data provided.</div>';
+    const card = chartCard('HP search', `${hp.length} trials`, 'plot-hp', 420);
+    mainEl().appendChild(card.wrap);
+    // detect the two HP columns
+    const keys = Object.keys(hp[0]).filter(k => !['auc', 'auprc'].includes(k));
+    const xKey = keys[0], yKey = keys[1] || keys[0];
+    Plotly.newPlot(card.plot, [{
+      type: 'scatter', mode: 'markers',
+      x: hp.map(t => t[xKey]), y: hp.map(t => t[yKey]),
+      marker: {
+        size: hp.map(t => 6 + Math.max(0, ((t.auc || 0.85) - 0.85) * 100)),
+        color: hp.map(t => t.auprc),
+        colorscale: 'Viridis',
+        colorbar: { title: { text: 'AUPRC', font: { size: 11 } }, thickness: 12 },
+        line: { width: 1, color: '#1e293b' },
+      },
+      hovertemplate: `${xKey} %{x}<br>${yKey} %{y}<br>AUPRC %{marker.color:.4f}<extra></extra>`,
+    }], baseLayout({
+      xaxis: { title: xKey, gridcolor: '#f1f5f9' },
+      yaxis: { title: yKey, gridcolor: '#f1f5f9' },
+      margin: { t: 10, r: 80, b: 46, l: 56 },
+    }), COMMON_CFG);
+  };
+
+  // ---------- Operating thresholds ----------
+  R['ops'] = () => {
+    mainEl().appendChild(pageHeader('Operating thresholds', 'Recommended score cutoffs at each depth.'));
+    const model = window.DATA.models[state.model];
+    const oot = model.splits.oot;
+    const depths = Object.keys(oot.by_depth).map(parseFloat).sort((a,b) => a - b);
+    const card = el('div', 'chart-wrap');
+    card.innerHTML = `<div class="chart-head">
+      <div class="chart-t">OOT operating policies · ${model.name}</div>
+      <div class="chart-s">cutoffs computed on OOT scores · ${oot.n.toLocaleString()} rows</div>
+    </div>`;
+    const tbl = el('table', 'rt-tbl');
+    const days = oot.daily?.length || 30;
+    tbl.innerHTML = `
+      <thead><tr><th>Policy</th><th>Depth</th><th>Score cutoff</th>
+        <th>Alerts/day</th><th>TP/day</th><th>FCR</th><th>Precision</th><th>G:F</th></tr></thead>
+      <tbody>${depths.map(d => {
+        const m = oot.by_depth[`${d}`];
+        const policy = d <= 0.01 ? '<span class="pill pill-good">high-precision review</span>'
+                    : d <= 0.02 ? '<span class="pill pill-accent">standard ops</span>'
+                    : d <= 0.03 ? '<span class="pill pill-warn">expanded review</span>'
+                    : '<span class="pill pill-bad">monitor-only</span>';
+        return `<tr>
+          <td>${policy}</td>
+          <td><strong>Top ${(d*100).toFixed(1)}%</strong></td>
+          <td><code>p ≥ ${m.score_threshold?.toFixed(4) ?? '—'}</code></td>
+          <td>${Math.round(m.alerts / days).toLocaleString()}</td>
+          <td>${Math.round(m.tp / days).toLocaleString()}</td>
+          <td>${fmtPct(m.fcr, 1)}</td>
+          <td>${fmtPct(m.precision, 1)}</td>
+          <td>${m.gf?.toFixed(1) ?? '—'}:1</td>
+        </tr>`;
+      }).join('')}</tbody>`;
+    card.appendChild(tbl);
+    mainEl().appendChild(card);
+  };
+})();
+
+// Bootstrap
+window.HUB.init();
+</script>
+
+</body>
+</html>
