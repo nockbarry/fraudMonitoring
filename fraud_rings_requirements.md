@@ -179,12 +179,38 @@ data model and chrome layer.
 - **D10.** Ring status values: `active` (32%), `monitoring` (28%),
   `investigating` (18%), `blocked` (22%) sampled at generation time.
 
-### 2.8 Aggregate KPIs
+### 2.8 Non-ring fraud
 
-- **D11.** Computed once at generation:
-  `N_RINGS`, `TOTAL_EXP`, `TOTAL_CAP`, `TOTAL_ACCTS`, `TOTAL_CARDS`,
-  `TOTAL_DEVS` (unique), `TOTAL_IPS` (unique), `ACTIVE_COUNT`,
-  `NEW_THIS_WEEK`, `SHARED_DEVS`, `SHARED_IPS`, `CAPTURE_RATE`.
+- **D11.** A separate `NON_RING` track represents uncoordinated single-actor
+  fraud — opportunistic individual fraud transactions that aren't members of
+  any ring. The dashboard surfaces this on portfolio-level plots (where the
+  question is "what is happening across all fraud") and excludes it from
+  ring-specific views (catalog, network graph, ring focus, overlap, queue).
+- **D12.** `NON_RING` fields:
+  - `label`: `'Non-ring fraud'`
+  - `color`: `#64748b` (slate gray, distinct from any archetype color)
+  - `status_mix`: `{ sent: 0.78, error: 0.08, denied: 0.14 }` — between the
+    cleanest archetypes (bust-out / first-party) and the messy ones (card
+    testing / ATO)
+  - `model_auc`: `0.84` — model handles individual fraud reasonably well via
+    velocity/risk features
+  - `model_recall_2pct`: `0.42`, `mean_score`: `0.18`
+  - `total_dollars`, `total_tx`, `total_sent`, `total_error`, `total_denied` —
+    aggregate totals
+  - `daily_dollars[d]`, `daily_tx_count[d]` — daily series with mid-week peak
+    seasonality (`1 + 0.18 · sin((dow − 1.5) · π/3.5)`) and a slight upward
+    drift (`1 + 0.0035·d`) so it isn't visually flat
+  - `daily_status_counts[d] = { sent, error, denied }` — multinomial split of
+    `daily_tx_count[d]` using the static `status_mix`
+  - `daily_recall[d]`, `daily_avg_score[d]` — flat baselines with light noise
+
+### 2.9 Aggregate KPIs
+
+- **D13.** Computed once at generation:
+  `N_RINGS`, `TOTAL_EXP` (rings only), `TOTAL_FRAUD_EXP` (rings + non-ring),
+  `NON_RING_SHARE` (non-ring $ as fraction of total fraud $), `TOTAL_CAP`,
+  `TOTAL_ACCTS`, `TOTAL_CARDS`, `TOTAL_DEVS` (unique), `TOTAL_IPS` (unique),
+  `ACTIVE_COUNT`, `NEW_THIS_WEEK`, `SHARED_DEVS`, `SHARED_IPS`, `CAPTURE_RATE`.
 
 ---
 
@@ -199,14 +225,20 @@ table or any node in the macro graph.
 - **P1.** Page header explaining the hub and citing aggregate counts.
 - **P2.** First KPI row (4 cards): active rings (bad), $ exposure (warn) with
   capture %, surfaced this week (accent), cross-ring overlap.
-- **P3.** Second KPI row (4 cards): accounts / cards / devices / IPs in rings.
+- **P3.** Second KPI row (4 cards): non-ring fraud $ (slate-gray border) with
+  share of total fraud, non-ring transactions with model AUC and recall, total
+  fraud $ (rings + non-ring), accounts in rings (with cards/devices/IPs in
+  the subtitle line).
 - **P4.** Side-by-side row: daily $ exposure stacked-area by archetype + daily
   transaction count stacked-area by archetype (same shape, very different per-
   archetype weighting — card-testing dominates the count chart, bust-out
-  dominates the dollars chart).
+  dominates the dollars chart). **Both charts include `Non-ring fraud` as the
+  bottom-most layer of each stack** (slate-gray, legend-visible on the $ chart
+  only to avoid duplicating the legend entry).
 - **P5.** Daily transaction status across all rings — stacked area of sent /
-  error / denied. Subtitle calls out card-testing as the source of the gray
-  layer.
+  error / denied. **Counts include non-ring fraud transactions** so the chart
+  represents the whole fraud-volume picture, not just rings. Subtitle calls
+  out card-testing as the source of the gray layer.
 - **P6.** Per-archetype model coverage: grouped bars of mean AUC per archetype
   and recall @ 2% on a secondary y-axis. Reference line at AUC=0.7.
 - **P7.** Two-column row: status pie (rings by status, donut, hole=0.5) +
@@ -291,7 +323,8 @@ table or any node in the macro graph.
   with `total_tx`. Two horizontal reference lines at 0.65 (bad) and 0.80
   (good). Click a node → `focus?r=<id>`. Hover shows ring id, $, AUC, tx count.
 - **P40.** Side-by-side: per-archetype AUC distribution boxplot + daily
-  portfolio recall @ 2% (volume-weighted).
+  portfolio recall @ 2% (volume-weighted, including non-ring fraud
+  transactions in the weighting).
 - **P41.** Top 25 blind-spots table (rings with AUC < 0.7, sorted by $ exposure):
   Ring, Archetype, $ exposure, total tx, AUC, recall %, mean score, status.
   Click to drill.
@@ -312,15 +345,20 @@ table or any node in the macro graph.
 
 - **P46.** Page header explaining sent/error/denied semantics with inline pills.
 - **P47.** 4 KPIs: total sent (green border), error (gray border), denied (red
-  border), card-testing share of total ring traffic (accent).
+  border), **Non-ring share** (slate-gray border) showing what fraction of all
+  fraud transactions are uncoordinated. Counts in all four KPIs include
+  non-ring fraud.
 - **P48.** Daily transaction status — portfolio total: stacked area of sent /
-  error / denied across all rings.
+  error / denied across all rings **plus non-ring fraud**.
 - **P49.** Daily status share — normalized: same data with `groupnorm: 'percent'`
   showing per-day share of each status.
 - **P50.** Status mix by archetype: horizontal stacked bars, one row per
-  archetype, percent labels inside each segment.
-- **P51.** Daily denied-rate trend by archetype: one line per archetype showing
-  daily volume-weighted denied rate (`null` for days with no traffic).
+  archetype plus a final **`Non-ring fraud`** row, percent labels inside
+  each segment.
+- **P51.** Daily denied-rate trend by archetype: one line per archetype
+  showing daily volume-weighted denied rate (`null` for days with no traffic),
+  plus a **dashed slate-gray line** for non-ring fraud as a comparison
+  baseline.
 - **P52.** Side-by-side: top-20 leaky rings (high `sent% × $`) table + top-20
   noisy rings (high `(error+denied) × tx_total`) table. Both clickable to drill.
 - **P53.** Closing callout on how Model coverage and Transaction status diverge:
@@ -341,7 +379,9 @@ table or any node in the macro graph.
 - **P58.** Page header.
 - **P59.** Active rings per day (line, fill-to-zero) with births (red bars)
   and deaths (green bars, plotted negative) on a secondary axis.
-- **P60.** Cumulative $ exposure per archetype: one line per archetype.
+- **P60.** Cumulative $ exposure per archetype: one line per archetype plus
+  a **dashed slate-gray line** for non-ring fraud cumulative exposure as a
+  comparison baseline.
 - **P61.** Ring lifetime distribution by current status (overlay histograms,
   bin size 5 days).
 

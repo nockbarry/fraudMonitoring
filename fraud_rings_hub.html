@@ -524,6 +524,50 @@ RINGS.forEach(r => {
   }));
 });
 
+// --- Non-ring fraud: uncoordinated single-actor activity ---
+// Significant fraction of total fraud volume isn't coordinated. The model
+// generally handles individual fraud well (velocity / risk-feature signal),
+// but it shows up on portfolio-level plots alongside ring activity.
+const NON_RING = (function () {
+  const baseDaily$  = 58_000;     // ~$58K/day baseline
+  const baseDailyTx = 2_400;
+  const mix = { sent: 0.78, error: 0.08, denied: 0.14 };
+  const daily_dollars = [], daily_tx_count = [], daily_status_counts = [];
+  let total_dollars = 0, total_tx = 0;
+  let total_sent = 0, total_error = 0, total_denied = 0;
+  for (let i = 0; i < N_DAYS; i++) {
+    const dow = i % 7;
+    // Mid-week peak, weekend dip — typical CNP-volume seasonality.
+    const seasonal = 1 + 0.18 * Math.sin((dow - 1.5) * Math.PI / 3.5);
+    // Slight upward drift across the window so the plot isn't flat.
+    const drift = 1 + i * 0.0035;
+    const $d = Math.max(0, baseDaily$  * seasonal * drift * (1 + 0.10 * gauss(rng)));
+    const tx = Math.max(0, Math.round(baseDailyTx * seasonal * drift * (1 + 0.10 * gauss(rng))));
+    const sent   = Math.round(tx * mix.sent);
+    const denied = Math.round(tx * mix.denied);
+    const error  = Math.max(0, tx - sent - denied);
+    daily_dollars.push($d);
+    daily_tx_count.push(tx);
+    daily_status_counts.push({ sent, error, denied });
+    total_dollars += $d; total_tx += tx;
+    total_sent += sent; total_error += error; total_denied += denied;
+  }
+  // Daily recall and mean score with very light noise.
+  const model_auc = 0.84;
+  const model_recall_2pct = 0.42;
+  const mean_score = 0.18;
+  const daily_recall    = dates.map(() => clip(model_recall_2pct + 0.05 * gauss(rng), 0, 1));
+  const daily_avg_score = dates.map(() => clip(mean_score        + 0.025 * gauss(rng), 0, 1));
+  return {
+    label: 'Non-ring fraud', color: '#64748b',
+    status_mix: mix,
+    model_auc, model_recall_2pct, mean_score,
+    total_dollars, total_tx, total_sent, total_error, total_denied,
+    daily_dollars, daily_tx_count, daily_status_counts,
+    daily_recall, daily_avg_score,
+  };
+})();
+
 // --- Compute headline KPIs ---
 const N_RINGS = RINGS.length;
 const TOTAL_EXP = RINGS.reduce((a, r) => a + r.$exp, 0);
@@ -537,6 +581,8 @@ const NEW_THIS_WEEK = RINGS.filter(r => r.first_day >= N_DAYS - 7).length;
 const SHARED_DEVS = Object.values(dev2rings).filter(rs => rs.length >= 2).length;
 const SHARED_IPS  = Object.values(ip2rings).filter(rs => rs.length >= 2).length;
 const CAPTURE_RATE = TOTAL_CAP / TOTAL_EXP;
+const TOTAL_FRAUD_EXP = TOTAL_EXP + NON_RING.total_dollars;
+const NON_RING_SHARE  = NON_RING.total_dollars / TOTAL_FRAUD_EXP;
 
 /* ============================================================================
    Helper utilities (DOM, formatting, charts)
@@ -695,10 +741,10 @@ ROUTES['overview'] = () => {
 
   const k2 = el('div', 'kpis');
   k2.innerHTML = `
-    <div class="kpi"><div class="kpi-l">Accounts in rings</div><div class="kpi-v">${fmtN(TOTAL_ACCTS)}</div><div class="kpi-s">across all rings</div></div>
-    <div class="kpi"><div class="kpi-l">Cards</div><div class="kpi-v">${fmtN(TOTAL_CARDS)}</div></div>
-    <div class="kpi"><div class="kpi-l">Devices</div><div class="kpi-v">${fmtN(TOTAL_DEVS)}</div></div>
-    <div class="kpi"><div class="kpi-l">IPs</div><div class="kpi-v">${fmtN(TOTAL_IPS)}</div></div>
+    <div class="kpi" style="border-left:3px solid ${NON_RING.color}"><div class="kpi-l">Non-ring fraud $</div><div class="kpi-v">${fmt$(NON_RING.total_dollars)}</div><div class="kpi-s">${fmtP(NON_RING_SHARE, 0)} of total fraud · uncoordinated activity</div></div>
+    <div class="kpi"><div class="kpi-l">Non-ring transactions</div><div class="kpi-v">${fmtN(NON_RING.total_tx)}</div><div class="kpi-s">model AUC ${NON_RING.model_auc.toFixed(2)} · recall @ 2% ${(NON_RING.model_recall_2pct*100).toFixed(0)}%</div></div>
+    <div class="kpi"><div class="kpi-l">Total fraud $ (rings + non-ring)</div><div class="kpi-v">${fmt$(TOTAL_FRAUD_EXP)}</div><div class="kpi-s">portfolio total exposure</div></div>
+    <div class="kpi"><div class="kpi-l">Accounts in rings</div><div class="kpi-v">${fmtN(TOTAL_ACCTS)}</div><div class="kpi-s">${fmtN(TOTAL_CARDS)} cards · ${fmtN(TOTAL_DEVS)} devices · ${fmtN(TOTAL_IPS)} IPs</div></div>
   `;
   m.appendChild(k2);
 
@@ -708,27 +754,41 @@ ROUTES['overview'] = () => {
   const cTime = chartCard('Daily $ exposure by archetype',
     'Stacked area shows fresh ring exposure landing each day. Bust-out clusters cause the largest single-day spikes.');
   r2t.appendChild(cTime.wrap);
-  Plotly.newPlot(cTime.plot, archOrder.map(a => ({
-    x: dates,
-    y: dates.map((_, di) =>
-      RINGS.filter(r => r.arch === a).reduce((s, r) => s + (r.daily_dollars[di] || 0), 0)
-    ),
-    type: 'scatter', mode: 'lines', stackgroup: 'one',
-    name: ARCH_LABEL[a], line: { width: 0 }, fillcolor: COLORS[a],
-  })), baseLayout({ yaxis: { title: '$ / day', tickformat: '$,.0s' }, height: 360 }), CFG);
+  // Non-ring is rendered as the bottom-most layer so the eye starts at "what
+  // we can't attribute to any ring" before stacking ring archetypes on top.
+  const nonRingTrace = (yarr, showLegend) => ({
+    x: dates, y: yarr, type: 'scatter', mode: 'lines', stackgroup: 'one',
+    name: NON_RING.label, line: { width: 0 }, fillcolor: NON_RING.color,
+    showlegend: showLegend !== false,
+  });
+
+  Plotly.newPlot(cTime.plot, [
+    nonRingTrace(NON_RING.daily_dollars, true),
+    ...archOrder.map(a => ({
+      x: dates,
+      y: dates.map((_, di) =>
+        RINGS.filter(r => r.arch === a).reduce((s, r) => s + (r.daily_dollars[di] || 0), 0)
+      ),
+      type: 'scatter', mode: 'lines', stackgroup: 'one',
+      name: ARCH_LABEL[a], line: { width: 0 }, fillcolor: COLORS[a],
+    })),
+  ], baseLayout({ yaxis: { title: '$ / day', tickformat: '$,.0s' }, height: 360 }), CFG);
 
   const cCount = chartCard('Daily transaction count by archetype',
-    'Same data, different lens. Card-testing rings dominate transaction count even though their $ exposure is tiny; bust-out is the inverse.');
+    'Same data, different lens. Card-testing rings dominate transaction count even though their $ exposure is tiny; bust-out is the inverse. Non-ring fraud is shown at the bottom of each stack.');
   r2t.appendChild(cCount.wrap);
-  Plotly.newPlot(cCount.plot, archOrder.map(a => ({
-    x: dates,
-    y: dates.map((_, di) =>
-      RINGS.filter(r => r.arch === a).reduce((s, r) => s + (r.daily_tx_count[di] || 0), 0)
-    ),
-    type: 'scatter', mode: 'lines', stackgroup: 'one',
-    name: ARCH_LABEL[a], line: { width: 0 }, fillcolor: COLORS[a],
-    showlegend: false,
-  })), baseLayout({ yaxis: { title: 'tx / day' }, height: 360 }), CFG);
+  Plotly.newPlot(cCount.plot, [
+    nonRingTrace(NON_RING.daily_tx_count, false),
+    ...archOrder.map(a => ({
+      x: dates,
+      y: dates.map((_, di) =>
+        RINGS.filter(r => r.arch === a).reduce((s, r) => s + (r.daily_tx_count[di] || 0), 0)
+      ),
+      type: 'scatter', mode: 'lines', stackgroup: 'one',
+      name: ARCH_LABEL[a], line: { width: 0 }, fillcolor: COLORS[a],
+      showlegend: false,
+    })),
+  ], baseLayout({ yaxis: { title: 'tx / day' }, height: 360 }), CFG);
   m.appendChild(r2t);
 
   // Daily transaction status across the whole portfolio
@@ -739,6 +799,7 @@ ROUTES['overview'] = () => {
   STATUS_KEYS.forEach(s => {
     portfolioStatus[s] = dates.map((_, di) =>
       RINGS.reduce((sum, r) => sum + ((r.daily_status_counts[di] || {})[s] || 0), 0)
+      + (NON_RING.daily_status_counts[di][s] || 0)
     );
   });
   Plotly.newPlot(cTxStatus.plot, STATUS_KEYS.map(s => ({
@@ -1374,6 +1435,11 @@ ROUTES['coverage'] = () => {
       const rec = r.daily_recall[di];
       if (tx > 0 && rec != null) { txTot += tx; recWeighted += rec * tx; }
     });
+    // Include non-ring fraud in the portfolio recall — it is part of the
+    // fraud the model is asked to catch.
+    const nrTx  = NON_RING.daily_tx_count[di];
+    const nrRec = NON_RING.daily_recall[di];
+    if (nrTx > 0 && nrRec != null) { txTot += nrTx; recWeighted += nrRec * nrTx; }
     return txTot > 0 ? recWeighted / txTot : null;
   });
   Plotly.newPlot(cRec.plot, [{
@@ -1514,18 +1580,19 @@ ROUTES['status'] = () => {
     `Every transaction completes in one of three terminal states — <span class="pill pill-good">sent</span> (completed), <span class="pill" style="background:#e2e8f0;color:#475569">error</span> (issuer/system failure), or <span class="pill pill-bad">denied</span> (blocked by policy or model). Status mix is one of the most operationally diagnostic signals you have: a card-testing ring is a 16/55/29 sent/error/denied fingerprint, while bust-out is 93/2/5 — visually identical to legitimate traffic until the bust day. This page tracks the mix portfolio-wide, per-archetype, and per-ring.`
   ));
 
-  // Portfolio totals across all rings
-  const totSent   = RINGS.reduce((s, r) => s + r.total_sent, 0);
-  const totError  = RINGS.reduce((s, r) => s + r.total_error, 0);
-  const totDenied = RINGS.reduce((s, r) => s + r.total_denied, 0);
+  // Portfolio totals = rings + non-ring fraud
+  const totSent   = RINGS.reduce((s, r) => s + r.total_sent, 0)   + NON_RING.total_sent;
+  const totError  = RINGS.reduce((s, r) => s + r.total_error, 0)  + NON_RING.total_error;
+  const totDenied = RINGS.reduce((s, r) => s + r.total_denied, 0) + NON_RING.total_denied;
   const totAll = totSent + totError + totDenied;
+  const nonRingTx = NON_RING.total_sent + NON_RING.total_error + NON_RING.total_denied;
 
   const kpis = el('div', 'kpis');
   kpis.innerHTML = `
     <div class="kpi" style="border-left:3px solid ${STATUS_COLORS.sent}"><div class="kpi-l">Sent</div><div class="kpi-v">${fmtN(totSent)}</div><div class="kpi-s">${fmtP(totSent / totAll)} of ring traffic</div></div>
     <div class="kpi" style="border-left:3px solid ${STATUS_COLORS.error}"><div class="kpi-l">Error</div><div class="kpi-v">${fmtN(totError)}</div><div class="kpi-s">${fmtP(totError / totAll)}</div></div>
     <div class="kpi" style="border-left:3px solid ${STATUS_COLORS.denied}"><div class="kpi-l">Denied</div><div class="kpi-v">${fmtN(totDenied)}</div><div class="kpi-s">${fmtP(totDenied / totAll)}</div></div>
-    <div class="kpi kpi-accent"><div class="kpi-l">Card-testing share</div><div class="kpi-v">${fmtP(RINGS.filter(r => r.arch === 'card_test').reduce((s, r) => s + r.total_sent + r.total_error + r.total_denied, 0) / totAll)}</div><div class="kpi-s">% of all ring transactions</div></div>
+    <div class="kpi" style="border-left:3px solid ${NON_RING.color}"><div class="kpi-l">Non-ring share</div><div class="kpi-v">${fmtP(nonRingTx / totAll)}</div><div class="kpi-s">${fmtN(nonRingTx)} tx · uncoordinated activity</div></div>
   `;
   m.appendChild(kpis);
 
@@ -1537,6 +1604,7 @@ ROUTES['status'] = () => {
   STATUS_KEYS.forEach(s => {
     portfolioByStatus[s] = dates.map((_, di) =>
       RINGS.reduce((sum, r) => sum + ((r.daily_status_counts[di] || {})[s] || 0), 0)
+      + (NON_RING.daily_status_counts[di][s] || 0)
     );
   });
   Plotly.newPlot(cTime.plot, STATUS_KEYS.map(s => ({
@@ -1572,11 +1640,18 @@ ROUTES['status'] = () => {
     const t = { sent: 0, error: 0, denied: 0 };
     rs.forEach(r => { t.sent += r.total_sent; t.error += r.total_error; t.denied += r.total_denied; });
     const tot = t.sent + t.error + t.denied || 1;
-    return { a, sent: t.sent / tot, error: t.error / tot, denied: t.denied / tot, totalTx: tot };
+    return { label: ARCH_LABEL[a], sent: t.sent / tot, error: t.error / tot, denied: t.denied / tot };
+  });
+  // Append the non-ring row so the chart compares all 10 archetypes side-by-side with non-ring fraud.
+  archMixData.push({
+    label: NON_RING.label,
+    sent: NON_RING.total_sent / nonRingTx,
+    error: NON_RING.total_error / nonRingTx,
+    denied: NON_RING.total_denied / nonRingTx,
   });
   Plotly.newPlot(cArch.plot, STATUS_KEYS.map(s => ({
     x: archMixData.map(d => d[s]),
-    y: archMixData.map(d => ARCH_LABEL[d.a]),
+    y: archMixData.map(d => d.label),
     type: 'bar', orientation: 'h', name: STATUS_LABEL[s],
     marker: { color: STATUS_COLORS[s] },
     text: archMixData.map(d => (d[s] * 100).toFixed(0) + '%'),
@@ -1586,32 +1661,44 @@ ROUTES['status'] = () => {
     barmode: 'stack',
     xaxis: { tickformat: '.0%', range: [0, 1] },
     yaxis: { autorange: 'reversed' },
-    height: 380, margin: { t: 20, r: 40, b: 46, l: 140 },
+    height: 400, margin: { t: 20, r: 40, b: 46, l: 140 },
   }), CFG);
 
   // Per-archetype daily denied rate over time (lines)
   const cDeniedTrend = chartCard('Daily denied-rate trend by archetype',
     'How much of each archetype\'s daily volume gets blocked. Rising lines mean the policy is starting to recognize the archetype. Flat low lines (e.g., bust-out) are the expected blind spots.');
   m.appendChild(cDeniedTrend.wrap);
-  Plotly.newPlot(cDeniedTrend.plot, ARCH_ORDER.map(a => {
-    const rs = RINGS.filter(r => r.arch === a);
-    return {
+  Plotly.newPlot(cDeniedTrend.plot, [
+    ...ARCH_ORDER.map(a => {
+      const rs = RINGS.filter(r => r.arch === a);
+      return {
+        x: dates,
+        y: dates.map((_, di) => {
+          let tx = 0, denied = 0;
+          rs.forEach(r => {
+            const c = r.daily_status_counts[di] || {};
+            tx += (c.sent || 0) + (c.error || 0) + (c.denied || 0);
+            denied += c.denied || 0;
+          });
+          return tx > 0 ? denied / tx : null;
+        }),
+        type: 'scatter', mode: 'lines', name: ARCH_LABEL[a],
+        line: { color: COLORS[a], width: 2 }, connectgaps: false,
+      };
+    }),
+    {
       x: dates,
       y: dates.map((_, di) => {
-        let tx = 0, denied = 0;
-        rs.forEach(r => {
-          const c = r.daily_status_counts[di] || {};
-          tx += (c.sent || 0) + (c.error || 0) + (c.denied || 0);
-          denied += c.denied || 0;
-        });
-        return tx > 0 ? denied / tx : null;
+        const c = NON_RING.daily_status_counts[di];
+        const tx = c.sent + c.error + c.denied;
+        return tx > 0 ? c.denied / tx : null;
       }),
-      type: 'scatter', mode: 'lines', name: ARCH_LABEL[a],
-      line: { color: COLORS[a], width: 2 }, connectgaps: false,
-    };
-  }), baseLayout({
+      type: 'scatter', mode: 'lines', name: NON_RING.label,
+      line: { color: NON_RING.color, width: 2.4, dash: 'dash' }, connectgaps: false,
+    },
+  ], baseLayout({
     yaxis: { title: 'denied rate', tickformat: '.0%' },
-    height: 340,
+    height: 360,
   }), CFG);
 
   // Top "leaks": rings with high sent rate AND high $ (sent past the policy)
@@ -1766,6 +1853,14 @@ ROUTES['growth'] = () => {
       type: 'scatter', mode: 'lines', name: ARCH_LABEL[a],
       line: { color: COLORS[a], width: 2 },
     };
+  });
+  // Non-ring cumulative as a dashed reference line
+  let nrCum = 0;
+  traces.push({
+    x: dates,
+    y: NON_RING.daily_dollars.map(v => (nrCum += v)),
+    type: 'scatter', mode: 'lines', name: NON_RING.label,
+    line: { color: NON_RING.color, width: 2.4, dash: 'dash' },
   });
   Plotly.newPlot(c2.plot, traces, baseLayout({
     yaxis: { title: 'cumulative $ exposure', tickformat: '$,.0s' },
@@ -2042,7 +2137,9 @@ function renderTop() {
     <span class="tstat-sep">·</span>
     <div class="tstat"><span>Active</span><strong>${ACTIVE_COUNT}</strong></div>
     <span class="tstat-sep">·</span>
-    <div class="tstat"><span>$ exposure</span><strong>${fmt$(TOTAL_EXP)}</strong></div>
+    <div class="tstat"><span>Ring $</span><strong>${fmt$(TOTAL_EXP)}</strong></div>
+    <span class="tstat-sep">·</span>
+    <div class="tstat"><span>Non-ring $</span><strong>${fmt$(NON_RING.total_dollars)}</strong></div>
     <span class="tstat-sep">·</span>
     <div class="tstat"><span>Capture</span><strong>${fmtP(CAPTURE_RATE, 0)}</strong></div>
   `;
