@@ -1462,7 +1462,7 @@ ROUTES['signals'] = () => {
   const cTopByArch = chartCard('Top 5 features per archetype',
     'Quick reference: each archetype\'s strongest signals. The top feature for one archetype is often near the bottom for another — there is no universal "best" feature.');
   r2.appendChild(cTopByArch.wrap);
-  const traces = ARCH_ORDER.slice(0, 6).map((a, i) => {
+  const traces = ARCH_ORDER.map((a, i) => {
     const top = Object.entries(featByArch[a]).sort((x, y) => y[1] - x[1]).slice(0, 5);
     return {
       x: top.map(([_, v]) => v),
@@ -1475,8 +1475,8 @@ ROUTES['signals'] = () => {
   Plotly.newPlot(cTopByArch.plot, traces, baseLayout({
     xaxis: { title: 'signal', range: [0, 1] },
     yaxis: { autorange: 'reversed' },
-    height: 360, margin: { t: 20, r: 20, b: 46, l: 180 },
-    legend: { orientation: 'v', x: 1.02, y: 1, font: { size: 10 } },
+    height: 420, margin: { t: 20, r: 20, b: 90, l: 180 },
+    legend: { orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center', font: { size: 10 } },
   }), CFG);
 
   const cBreadth = chartCard('Feature breadth — how many archetypes light up each feature',
@@ -1497,7 +1497,7 @@ ROUTES['signals'] = () => {
   }], baseLayout({
     xaxis: { title: '# archetypes where signal > 0.4' },
     yaxis: { autorange: 'reversed' }, showlegend: false,
-    margin: { t: 20, r: 60, b: 46, l: 180 }, height: 360,
+    margin: { t: 20, r: 60, b: 46, l: 180 }, height: 420,
   }), CFG);
   m.appendChild(r2);
 
