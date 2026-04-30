@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fraud Monitoring Dashboards</title>
+<style>
+:root {
+  --bg: #0f172a; --bg-2: #1e293b; --bg-3: #334155;
+  --fg: #f1f5f9; --dim: #cbd5e1; --dim-2: #94a3b8;
+  --accent: #6366f1; --accent-2: #818cf8;
+  --good: #10b981; --warn: #f59e0b; --bad: #ef4444;
+  --invariant: #0ea5e9; --tactical: #f59e0b; --compositional: #a855f7;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.55;
+  min-height: 100vh;
+}
+a { color: var(--accent-2); text-decoration: none; }
+a:hover { color: var(--fg); }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 60px 28px 80px; }
+
+.hero { margin-bottom: 50px; }
+.hero h1 {
+  font-size: 36px; font-weight: 800; margin: 0 0 10px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(90deg, #f1f5f9 0%, #c7d2fe 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero .tagline {
+  font-size: 17px; color: var(--dim); margin: 0 0 18px; max-width: 720px;
+}
+.hero .pre {
+  font-size: 11px; color: var(--accent-2); text-transform: uppercase;
+  letter-spacing: 2px; font-weight: 600; margin-bottom: 14px;
+}
+.hero .meta {
+  display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px;
+  color: var(--dim-2); margin-top: 16px;
+}
+.hero .meta span strong { color: var(--fg); font-weight: 600; }
+
+.section-h {
+  font-size: 11px; color: var(--dim-2); text-transform: uppercase;
+  letter-spacing: 1.5px; font-weight: 700; margin: 40px 0 16px;
+}
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--bg-3);
+  border-radius: 12px; padding: 22px 22px 18px;
+  display: flex; flex-direction: column;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  cursor: pointer; text-decoration: none; color: inherit;
+}
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+  box-shadow: 0 12px 28px -8px rgba(99,102,241,0.4);
+}
+.card .num {
+  font-size: 11px; color: var(--accent-2); font-weight: 700;
+  letter-spacing: 1px; margin-bottom: 8px;
+}
+.card .t {
+  font-size: 18px; font-weight: 700; color: var(--fg);
+  margin: 0 0 8px; letter-spacing: -0.2px;
+}
+.card .d { font-size: 13.5px; color: var(--dim); flex: 1; line-height: 1.5; }
+.card .links {
+  margin-top: 18px; display: flex; gap: 14px; flex-wrap: wrap;
+  font-size: 12px;
+}
+.card .links a { color: var(--accent-2); }
+.card .links a::before { content: '→ '; color: var(--dim-2); }
+
+.intro {
+  background: var(--bg-2); border: 1px solid var(--bg-3);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px; padding: 18px 22px;
+  font-size: 14px; color: var(--dim);
+  margin-bottom: 24px;
+}
+.intro strong { color: var(--fg); }
+.intro p { margin: 0 0 8px; }
+.intro p:last-child { margin: 0; }
+
+.legend {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  font-size: 12px; color: var(--dim-2);
+  margin-top: 12px;
+}
+.legend .l { display: flex; align-items: center; gap: 6px; }
+.legend .dot {
+  width: 8px; height: 8px; border-radius: 2px;
+  display: inline-block;
+}
+.dot-inv { background: var(--invariant); }
+.dot-tac { background: var(--tactical); }
+.dot-cmp { background: var(--compositional); }
+
+.story {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+  margin-top: 18px;
+}
+@media (max-width: 700px) { .story { grid-template-columns: 1fr; } }
+.story .item {
+  background: rgba(99,102,241,0.06);
+  border-left: 2px solid var(--accent);
+  padding: 10px 14px; border-radius: 4px;
+  font-size: 13px; color: var(--dim);
+}
+.story .item strong { color: var(--fg); display: block; margin-bottom: 2px; font-size: 12px; }
+
+footer {
+  margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--bg-3);
+  font-size: 12px; color: var(--dim-2);
+  display: flex; gap: 18px; flex-wrap: wrap;
+}
+footer a { color: var(--dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="pre">▌ fraud monitoring dashboards</div>
+    <h1>Stability, performance, and feature analysis for transaction fraud models</h1>
+    <p class="tagline">
+      Three companion dashboards designed around the failure modes that matter in
+      production fraud modeling — model performance, feature health, and the
+      stability/calibration disciplines that catch attacks the headline AUC misses.
+      Demo data is synthetic but parameterized to a realistic 0.4–0.9% fraud-rate
+      problem with 84 features across 630k transactions.
+    </p>
+    <div class="meta">
+      <span><strong>10 weeks</strong> · 70 days of transactions</span>
+      <span><strong>630k</strong> transactions</span>
+      <span><strong>84</strong> engineered features</span>
+      <span><strong>2</strong> trained models (GBM champion, LR challenger)</span>
+      <span><strong>Regime shift</strong> planted at week 8</span>
+    </div>
+  </header>
+
+  <div class="intro">
+    <p>Each hub is a <strong>standalone HTML file</strong> — open it directly, no server
+    required. The dashboards share the same dark-sidebar layout and cross-link to each
+    other. The "demo" variants are populated by real metrics computed from a synthetic
+    transaction dataset with an entity-driven generator (accounts → cards → merchants →
+    devices → IPs, with proper time-windowed velocity features and multiple fraud
+    archetypes).</p>
+    <div class="legend">
+      <span class="l"><span class="dot dot-inv"></span>invariant features (device, behavioral, structural)</span>
+      <span class="l"><span class="dot dot-tac"></span>tactical features (current attack surface)</span>
+      <span class="l"><span class="dot dot-cmp"></span>compositional (aggregations / embeddings)</span>
+    </div>
+  </div>
+
+  <div class="section-h">Dashboards</div>
+
+  <div class="cards">
+    <a class="card" href="./model_performance_hub_demo.html">
+      <div class="num">01 / model performance</div>
+      <h3 class="t">Model Performance Hub</h3>
+      <p class="d">
+        ROC, PR, calibration, lift &amp; gains, score histograms, daily stability,
+        feature importance, model comparison, cohort breakdowns, and operating
+        thresholds. Two models (GBM vs LR) across train/cal/oot/recent splits.
+      </p>
+      <div class="links">
+        <span>Open dashboard</span>
+        <a href="./model_performance_hub.html">original synthetic demo</a>
+      </div>
+    </a>
+
+    <a class="card" href="./feature_analysis_hub_demo.html">
+      <div class="num">02 / feature analysis</div>
+      <h3 class="t">Feature Analysis Hub</h3>
+      <p class="d">
+        Per-feature importance, univariate AUC, drift, missing rate, anomaly trace,
+        behavior buckets, partial dependence, and category share over time. 87
+        features ranked by permutation importance against the GBM.
+      </p>
+      <div class="links">
+        <span>Open dashboard</span>
+        <a href="./feature_analysis_hub.html">original synthetic demo</a>
+      </div>
+    </a>
+
+    <a class="card" href="./stability_monitoring_hub_demo.html">
+      <div class="num">03 / stability &amp; calibration</div>
+      <h3 class="t">Stability &amp; Calibration Hub</h3>
+      <p class="d">
+        The diagnostic toolkit for the failure mode where AUC stays flat but
+        production thresholds break. Importance concentration, stability buckets,
+        conditional PSI, adversarial validation, decile drift, dual-signal check,
+        cohort fragility, label maturity, threshold construction, and post-deploy
+        monitoring.
+      </p>
+      <div class="links">
+        <span>Open dashboard</span>
+        <a href="./stability_monitoring_hub.html">original synthetic demo</a>
+      </div>
+    </a>
+  </div>
+
+  <div class="section-h">The story across the three hubs (demo data)</div>
+
+  <div class="story">
+    <div class="item">
+      <strong>Headline AUC holds</strong>
+      GBM AUC 0.891 train → 0.783 OOT looks defensible at the model-review level.
+    </div>
+    <div class="item">
+      <strong>Calibration breaks</strong>
+      ECE grows ~5× across splits (0.0008 train → 0.0042 recent). Threshold-based
+      policy is now miscalibrated against the new population.
+    </div>
+    <div class="item">
+      <strong>Every cohort degrades</strong>
+      All five channels show 9–13 point AUC drops train→OOT — uniform degradation,
+      symptomatic of regime change rather than one bad slice.
+    </div>
+    <div class="item">
+      <strong>Adversarial validation flags drift</strong>
+      A train-vs-OOT classifier hits AUC 0.65 from features alone — the feature
+      space is meaningfully different from training.
+    </div>
+    <div class="item">
+      <strong>Tactical features lead the drift</strong>
+      Top adversarial discriminators are the velocity/MCC/declines — exactly the
+      features expected to track an evolving attack surface.
+    </div>
+    <div class="item">
+      <strong>Concept &gt; distribution drift</strong>
+      Most features show subtle distribution shifts but real univariate AUC drops
+      — the relationship between features and the target moved more than the
+      features themselves.
+    </div>
+  </div>
+
+  <div class="section-h">Source &amp; reproduction</div>
+
+  <div class="intro" style="border-left-color: var(--good);">
+    <p>The Python builder under <code>builder/</code> consumes a scored DataFrame +
+    trained model and emits the three reports. Run <code>python demo_fraud.py</code> to
+    regenerate everything end-to-end (~33s on a hot dataset cache). Templates use a
+    single <code>__DATA_JSON__</code> placeholder so any payload that matches the schema
+    can drive the visualizations.</p>
+    <p>The dataset generator (<code>builder/dataset.py</code>) is entity-driven: persistent
+    account/card/merchant/device/IP tables, properly time-windowed velocity computed via
+    two-pointer sweep per card, and a planted BIN-cluster attack starting on day 49 of
+    the 70-day window. Fraud rates calibrate to <strong>0.42% pre-shift</strong> and
+    <strong>0.83% post-shift</strong>.</p>
+  </div>
+
+  <footer>
+    <a href="https://github.com/nockbarry/fraudMonitoring">github.com/nockbarry/fraudMonitoring</a>
+    <span>·</span>
+    <span>plotly.js via CDN</span>
+    <span>·</span>
+    <span>self-contained, no build step</span>
+  </footer>
+
+</div>
+</body>
+</html>
