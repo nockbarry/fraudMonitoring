@@ -756,14 +756,13 @@ ROUTES['overview'] = () => {
   r2t.appendChild(cTime.wrap);
   // Non-ring is rendered as the bottom-most layer so the eye starts at "what
   // we can't attribute to any ring" before stacking ring archetypes on top.
-  const nonRingTrace = (yarr, showLegend) => ({
+  const nonRingTrace = (yarr) => ({
     x: dates, y: yarr, type: 'scatter', mode: 'lines', stackgroup: 'one',
     name: NON_RING.label, line: { width: 0 }, fillcolor: NON_RING.color,
-    showlegend: showLegend !== false,
   });
 
   Plotly.newPlot(cTime.plot, [
-    nonRingTrace(NON_RING.daily_dollars, true),
+    nonRingTrace(NON_RING.daily_dollars),
     ...archOrder.map(a => ({
       x: dates,
       y: dates.map((_, di) =>
@@ -775,10 +774,10 @@ ROUTES['overview'] = () => {
   ], baseLayout({ yaxis: { title: '$ / day', tickformat: '$,.0s' }, height: 360 }), CFG);
 
   const cCount = chartCard('Daily transaction count by archetype',
-    'Same data, different lens. Card-testing rings dominate transaction count even though their $ exposure is tiny; bust-out is the inverse. Non-ring fraud is shown at the bottom of each stack.');
+    'Same data, different lens. Card-testing rings dominate transaction count even though their $ exposure is tiny; bust-out is the inverse. Non-ring fraud is shown at the bottom of each stack. Legend toggles are synced between the two charts.');
   r2t.appendChild(cCount.wrap);
   Plotly.newPlot(cCount.plot, [
-    nonRingTrace(NON_RING.daily_tx_count, false),
+    nonRingTrace(NON_RING.daily_tx_count),
     ...archOrder.map(a => ({
       x: dates,
       y: dates.map((_, di) =>
@@ -786,10 +785,41 @@ ROUTES['overview'] = () => {
       ),
       type: 'scatter', mode: 'lines', stackgroup: 'one',
       name: ARCH_LABEL[a], line: { width: 0 }, fillcolor: COLORS[a],
-      showlegend: false,
     })),
   ], baseLayout({ yaxis: { title: 'tx / day' }, height: 360 }), CFG);
   m.appendChild(r2t);
+
+  // Sync legend toggles: clicking a series in one chart hides/shows the same
+  // series in the other chart. We mirror the user's intent by inverting the
+  // current visibility — plotly_legendclick fires *before* the toggle is
+  // applied, so the source's eventual state matches the inverse of its
+  // current state. Setting the partner to that same target keeps both in sync.
+  function syncLegendToggle(sourceDiv, partnerDiv) {
+    sourceDiv.on('plotly_legendclick', (event) => {
+      const traceName = event.data[event.curveNumber]?.name;
+      if (!traceName) return true;
+      const j = partnerDiv.data.findIndex(t => t.name === traceName);
+      if (j < 0) return true;
+      const cur = partnerDiv.data[j].visible;
+      const next = (cur === 'legendonly') ? true : 'legendonly';
+      Plotly.restyle(partnerDiv, { visible: next }, [j]);
+      return true;   // allow default toggle on source
+    });
+    sourceDiv.on('plotly_legenddoubleclick', (event) => {
+      // Plotly's default double-click isolates that series. Mirror the same
+      // isolation on the partner: show only the matched trace, hide the rest.
+      const traceName = event.data[event.curveNumber]?.name;
+      if (!traceName) return true;
+      const update = partnerDiv.data.map(t => t.name === traceName ? true : 'legendonly');
+      // If everything is already isolated to that trace, clicking again restores all.
+      const alreadyIsolated = partnerDiv.data.every((t, i) => (t.visible !== 'legendonly') === (t.name === traceName));
+      Plotly.restyle(partnerDiv,
+        { visible: alreadyIsolated ? partnerDiv.data.map(() => true) : update });
+      return true;
+    });
+  }
+  syncLegendToggle(cTime.plot, cCount.plot);
+  syncLegendToggle(cCount.plot, cTime.plot);
 
   // Daily transaction status across the whole portfolio
   const cTxStatus = chartCard('Daily transaction status across all rings',

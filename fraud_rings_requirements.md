@@ -233,8 +233,12 @@ table or any node in the macro graph.
   transaction count stacked-area by archetype (same shape, very different per-
   archetype weighting — card-testing dominates the count chart, bust-out
   dominates the dollars chart). **Both charts include `Non-ring fraud` as the
-  bottom-most layer of each stack** (slate-gray, legend-visible on the $ chart
-  only to avoid duplicating the legend entry).
+  bottom-most layer of each stack** (slate-gray). **Both charts have their own
+  legend** and the legends are **synced**: clicking a series in either chart's
+  legend toggles the same series in the other chart, and double-click
+  (Plotly's "isolate this series") mirrors across both charts as well. The
+  sync is implemented via `plotly_legendclick` and `plotly_legenddoubleclick`
+  handlers that match traces by `name`.
 - **P5.** Daily transaction status across all rings — stacked area of sent /
   error / denied. **Counts include non-ring fraud transactions** so the chart
   represents the whole fraud-volume picture, not just rings. Subtitle calls
