@@ -127,6 +127,11 @@ body {
 .pill-card-test { background: #fef3c7; color: #92400e; }
 .pill-bust-out { background: #fee2e2; color: #991b1b; }
 .pill-ato { background: #ccfbf1; color: #115e59; }
+.pill-triangulation { background: #fce7f3; color: #9f1239; }
+.pill-refund { background: #ede9fe; color: #5b21b6; }
+.pill-first-party { background: #ffedd5; color: #9a3412; }
+.pill-friendly { background: #cffafe; color: #155e75; }
+.pill-promo-abuse { background: #ecfccb; color: #3f6212; }
 .pill-status-active { background: #fee2e2; color: #991b1b; }
 .pill-status-monitoring { background: #fef3c7; color: #92400e; }
 .pill-status-blocked { background: #d1fae5; color: #065f46; }
@@ -219,16 +224,52 @@ const FONT = { family: 'Inter, -apple-system, Segoe UI, Roboto, sans-serif', siz
 const CFG = { responsive: true, displayModeBar: false };
 const COLORS = {
   syn_id: '#a855f7', mule: '#0ea5e9', card_test: '#f59e0b', bust_out: '#ef4444', ato: '#14b8a6',
+  triangulation: '#ec4899', refund: '#8b5cf6', first_party: '#f97316', friendly: '#06b6d4', promo_abuse: '#84cc16',
   acct: '#6366f1', card: '#f59e0b', dev: '#10b981', ip: '#ec4899', merch: '#94a3b8',
   good: '#10b981', warn: '#f59e0b', bad: '#ef4444', accent: '#6366f1',
   active: '#ef4444', monitoring: '#f59e0b', blocked: '#10b981', investigating: '#6366f1',
 };
 const ARCH_LABEL = {
-  syn_id:    'Synthetic ID',
-  mule:      'Mule network',
-  card_test: 'Card testing',
-  bust_out:  'Bust-out',
-  ato:       'ATO cluster',
+  syn_id:        'Synthetic ID',
+  mule:          'Mule network',
+  card_test:     'Card testing',
+  bust_out:      'Bust-out',
+  ato:           'ATO cluster',
+  triangulation: 'Triangulation',
+  refund:        'Refund fraud',
+  first_party:   'First-party',
+  friendly:      'Friendly fraud',
+  promo_abuse:   'Promo abuse',
+};
+const ARCH_ORDER = ['syn_id','mule','card_test','bust_out','ato','triangulation','refund','first_party','friendly','promo_abuse'];
+const clip = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+// Master feature pool used for per-ring feature-signal vectors.
+const FEATURE_POOL = [
+  'velocity_amt_card_1h','velocity_cnt_card_24h','velocity_amt_card_7d',
+  'declined_attempts_7d','3ds_fail','bin_country_high_risk',
+  'merchant_risk_30d','merchant_age_under_30d','amt_band_high',
+  'device_changed_recent','device_num_accounts','device_jailbroken',
+  'ip_is_vpn','ip_anon_share','account_age_under_30d',
+  'amt_z_account','session_duration_dev','keystroke_var_dev',
+  'address_match_score','cnp_x_new_account','high_amt_x_new_merchant',
+  'embed_merchant_d1','embed_device_net_d2','is_recurring_merchant','card_tenure_days',
+];
+
+// Per-archetype feature signature: which features should light up the most.
+// `weight` controls overall signal strength (= how predictable rings of this
+// archetype are by these features alone).
+const ARCH_FEATURE_PROFILE = {
+  syn_id:        { top: ['address_match_score','account_age_under_30d','embed_device_net_d2','device_num_accounts','cnp_x_new_account','ip_anon_share'], weight: 0.68 },
+  mule:          { top: ['velocity_amt_card_7d','embed_merchant_d1','merchant_risk_30d','is_recurring_merchant','amt_band_high','velocity_cnt_card_24h'], weight: 0.72 },
+  card_test:     { top: ['velocity_cnt_card_24h','3ds_fail','declined_attempts_7d','velocity_amt_card_1h','merchant_age_under_30d','device_num_accounts'], weight: 0.88 },
+  bust_out:      { top: ['amt_band_high','amt_z_account','card_tenure_days','merchant_age_under_30d','velocity_amt_card_7d','high_amt_x_new_merchant'], weight: 0.55 },
+  ato:           { top: ['device_changed_recent','session_duration_dev','keystroke_var_dev','ip_is_vpn','address_match_score','ip_anon_share'], weight: 0.78 },
+  triangulation: { top: ['merchant_age_under_30d','merchant_risk_30d','embed_merchant_d1','high_amt_x_new_merchant','device_num_accounts','3ds_fail'], weight: 0.70 },
+  refund:        { top: ['merchant_risk_30d','amt_z_account','is_recurring_merchant','velocity_amt_card_7d','cnp_x_new_account','amt_band_high'], weight: 0.58 },
+  first_party:   { top: ['account_age_under_30d','card_tenure_days','amt_z_account','amt_band_high','merchant_age_under_30d','high_amt_x_new_merchant'], weight: 0.50 },
+  friendly:      { top: ['amt_z_account','merchant_risk_30d','is_recurring_merchant','address_match_score','cnp_x_new_account','3ds_fail'], weight: 0.55 },
+  promo_abuse:   { top: ['account_age_under_30d','device_num_accounts','embed_device_net_d2','merchant_age_under_30d','amt_band_high','ip_anon_share'], weight: 0.66 },
 };
 
 /* ============================================================================
@@ -242,12 +283,20 @@ const dates = Array.from({ length: N_DAYS }, (_, i) => {
 });
 
 // Archetype templates: ring size distribution + behavior fingerprint
+// 10 archetypes, 240+ rings total. baseline_auc = how well the production
+// model catches transactions of this kind on average; tx_per_acct = mean tx
+// volume per ring member (mean, std).
 const ARCH_TPL = {
-  syn_id:    { count: 12, n_acct: [40, 12], n_card: [60, 18], n_dev: [10, 4], n_ip: [8, 3], $exp: [85_000, 42_000], shareDev: 0.65, shareIp: 0.55 },
-  mule:      { count: 9,  n_acct: [85, 22], n_card: [110, 30], n_dev: [60, 18], n_ip: [40, 14], $exp: [220_000, 85_000], shareDev: 0.18, shareIp: 0.12 },
-  card_test: { count: 8,  n_acct: [12, 5],  n_card: [320, 90], n_dev: [4, 2],  n_ip: [3, 1],  $exp: [12_000, 4_500], shareDev: 0.95, shareIp: 0.92 },
-  bust_out:  { count: 6,  n_acct: [22, 6],  n_card: [22, 6],   n_dev: [22, 6], n_ip: [18, 4], $exp: [340_000, 110_000], shareDev: 0.10, shareIp: 0.08 },
-  ato:       { count: 7,  n_acct: [55, 14], n_card: [55, 14],  n_dev: [3, 1],  n_ip: [4, 2],  $exp: [180_000, 60_000], shareDev: 0.98, shareIp: 0.88 },
+  syn_id:        { count: 35, n_acct: [40, 12],  n_card: [60, 18],   n_dev: [10, 4],  n_ip: [8, 3],   $exp: [85_000, 42_000],  shareDev: 0.65, shareIp: 0.55, baseline_auc: 0.72, tx_per_acct: [12, 4] },
+  mule:          { count: 28, n_acct: [85, 22],  n_card: [110, 30],  n_dev: [60, 18], n_ip: [40, 14], $exp: [220_000, 85_000], shareDev: 0.18, shareIp: 0.12, baseline_auc: 0.78, tx_per_acct: [25, 8] },
+  card_test:     { count: 26, n_acct: [12, 5],   n_card: [320, 90],  n_dev: [4, 2],   n_ip: [3, 1],   $exp: [12_000, 4_500],   shareDev: 0.95, shareIp: 0.92, baseline_auc: 0.93, tx_per_acct: [180, 50] },
+  bust_out:      { count: 18, n_acct: [22, 6],   n_card: [22, 6],    n_dev: [22, 6],  n_ip: [18, 4],  $exp: [340_000, 110_000], shareDev: 0.10, shareIp: 0.08, baseline_auc: 0.65, tx_per_acct: [8, 3] },
+  ato:           { count: 28, n_acct: [55, 14],  n_card: [55, 14],   n_dev: [3, 1],   n_ip: [4, 2],   $exp: [180_000, 60_000], shareDev: 0.98, shareIp: 0.88, baseline_auc: 0.81, tx_per_acct: [10, 4] },
+  triangulation: { count: 22, n_acct: [30, 10],  n_card: [220, 60],  n_dev: [25, 8],  n_ip: [20, 6],  $exp: [195_000, 70_000], shareDev: 0.45, shareIp: 0.35, baseline_auc: 0.74, tx_per_acct: [30, 10] },
+  refund:        { count: 20, n_acct: [40, 12],  n_card: [50, 14],   n_dev: [25, 8],  n_ip: [22, 7],  $exp: [62_000, 22_000],  shareDev: 0.30, shareIp: 0.25, baseline_auc: 0.58, tx_per_acct: [6, 2] },
+  first_party:   { count: 16, n_acct: [18, 5],   n_card: [22, 6],    n_dev: [18, 5],  n_ip: [16, 5],  $exp: [105_000, 38_000], shareDev: 0.08, shareIp: 0.07, baseline_auc: 0.55, tx_per_acct: [12, 4] },
+  friendly:      { count: 20, n_acct: [55, 14],  n_card: [70, 16],   n_dev: [50, 14], n_ip: [42, 12], $exp: [42_000, 14_000],  shareDev: 0.06, shareIp: 0.05, baseline_auc: 0.62, tx_per_acct: [8, 3] },
+  promo_abuse:   { count: 30, n_acct: [110, 28], n_card: [130, 30],  n_dev: [70, 18], n_ip: [55, 15], $exp: [28_000, 9_000],   shareDev: 0.40, shareIp: 0.32, baseline_auc: 0.71, tx_per_acct: [4, 1.5] },
 };
 
 const STATUSES = ['active', 'monitoring', 'investigating', 'blocked'];
@@ -368,18 +417,65 @@ Object.entries(ringPairs).forEach(([k, count]) => {
   overlapEdges.push({ a, b, kind, count });
 });
 
-// --- Daily timeline: per-ring fraud_rate and $exposure ---
+// --- Daily timeline: per-ring $ exposure, tx count, model score, recall ---
 RINGS.forEach(r => {
-  r.daily_dollars = dates.map((d, di) => {
+  const tpl = ARCH_TPL[r.arch];
+  const total_tx = Math.max(5, Math.round(r.n_acct * (tpl.tx_per_acct[0] + gauss(rng) * tpl.tx_per_acct[1])));
+  r.total_tx = total_tx;
+
+  // Per-ring model AUC: archetype baseline + idiosyncratic noise. Some rings
+  // are well-covered, some are blind spots.
+  const ringAucNoise = gauss(rng) * 0.06;
+  // Older / longer-lived rings tend to be slightly worse-covered (attackers adapt)
+  const lifetimePenalty = Math.min(0.05, r.lifetime * 0.0008);
+  r.model_auc = clip(tpl.baseline_auc + ringAucNoise - lifetimePenalty, 0.50, 0.99);
+  // Recall at 2% alert depth, derived from AUC roughly (and bounded).
+  r.model_recall_2pct = clip((r.model_auc - 0.5) * 1.5 + 0.05 + gauss(rng) * 0.04, 0.0, 0.95);
+  // Mean model score on this ring's transactions across the lifetime.
+  r.mean_score = clip(0.04 + (r.model_auc - 0.5) * 0.42 + gauss(rng) * 0.03, 0.005, 0.95);
+
+  // Daily lifecycle shape (triangular: ramp to peak, decay)
+  const dailyShape = dates.map((d, di) => {
     if (di < r.first_day || di > r.last_day) return 0;
     const t = (di - r.first_day) / Math.max(1, r.lifetime);
-    // Triangular-ish: ramps up to peak, then decays
     const peakT = (r.peak_day - r.first_day) / Math.max(1, r.lifetime);
-    const v = t <= peakT ? t / peakT : 1 - (t - peakT) / (1 - peakT + 0.01);
+    return t <= peakT ? t / peakT : 1 - (t - peakT) / (1 - peakT + 0.01);
+  });
+  r.daily_dollars = dailyShape.map((v, di) => {
+    if (v === 0) return 0;
     const noise = 0.15 * Math.abs(gauss(rng));
     return Math.max(0, r.$exp * v / r.lifetime * (1 + noise));
   });
-  r.daily_alerts = r.daily_dollars.map(d => Math.round(d / 200 + Math.abs(gauss(rng)) * 2));
+  r.daily_tx_count = dailyShape.map((v, di) => {
+    if (v === 0) return 0;
+    const noise = 0.20 * Math.abs(gauss(rng));
+    return Math.round(Math.max(0, total_tx * v / r.lifetime * (1 + noise)));
+  });
+  // Daily mean score: drifts a bit over the ring's lifetime (model adapts late
+  // for some rings; for others the score collapses as attackers adapt away).
+  const scoreDrift = gauss(rng) * 0.10;   // direction of per-ring score drift
+  r.daily_avg_score = dailyShape.map((v, di) => {
+    if (v === 0) return null;
+    const t = (di - r.first_day) / Math.max(1, r.lifetime);
+    const drift = scoreDrift * (t - 0.5);
+    return clip(r.mean_score + drift + gauss(rng) * 0.02, 0.005, 0.99);
+  });
+  // Daily recall: same baseline shape but noisier; some rings show clear
+  // recall growth as model retrains (positive scoreDrift) and others decay.
+  r.daily_recall = dailyShape.map((v, di) => {
+    if (v === 0) return null;
+    const t = (di - r.first_day) / Math.max(1, r.lifetime);
+    const drift = scoreDrift * 1.4 * (t - 0.5);
+    return clip(r.model_recall_2pct + drift + gauss(rng) * 0.05, 0.0, 1.0);
+  });
+  r.daily_alerts = r.daily_tx_count.map((tx, di) => Math.round(tx * (0.02 + r.model_recall_2pct * 0.10) + Math.abs(gauss(rng))));
+
+  // Feature-signal vector: archetype top-K features with per-ring strength.
+  const profile = ARCH_FEATURE_PROFILE[r.arch];
+  r.feature_signal = profile.top.map((f, i) => ({
+    name: f,
+    strength: clip(profile.weight * (1 - i * 0.10) + gauss(rng) * 0.07, 0.05, 0.99),
+  }));
 });
 
 // --- Compute headline KPIs ---
@@ -490,7 +586,7 @@ function macroLayout() {
   RINGS.forEach(r => { (groups[r.arch] = groups[r.arch] || []).push(r); });
   const out = [];
   let archIdx = 0;
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const archOrder = ARCH_ORDER;
   archOrder.forEach(a => {
     if (!groups[a]) return;
     groups[a].sort((x, y) => y.$exp - x.$exp);
@@ -517,7 +613,11 @@ const NAV = [
   { id: 'overview',  title: 'Overview', kind: 'direct' },
   { id: 'catalog',   title: 'Ring catalog', kind: 'direct', badge: String(N_RINGS) },
   { id: 'graph',     title: 'Network graph', kind: 'direct', badge: 'live', badgeKind: 'accent' },
-  { id: 'archetype', title: 'Archetype breakdown', kind: 'direct' },
+  { id: 'archetype', title: 'Archetype breakdown', kind: 'direct',
+    badge: String(ARCH_ORDER.length), badgeKind: 'accent' },
+  { id: 'coverage',  title: 'Model coverage', kind: 'direct',
+    badge: String(RINGS.filter(r => r.model_auc < 0.6).length), badgeKind: 'bad' },
+  { id: 'signals',   title: 'Feature signals', kind: 'direct' },
   { id: 'overlap',   title: 'Cross-ring overlap', kind: 'direct',
     badge: String(SHARED_DEVS + SHARED_IPS), badgeKind: 'warn' },
   { id: 'growth',    title: 'Growth & decay', kind: 'direct' },
@@ -554,24 +654,58 @@ ROUTES['overview'] = () => {
   `;
   m.appendChild(k2);
 
-  // Daily $ exposure timeline by archetype
+  // Daily $ exposure and tx-count side-by-side
+  const archOrder = ARCH_ORDER;
+  const r2t = el('div', 'row2');
   const cTime = chartCard('Daily $ exposure by archetype',
-    'Stacked area shows fresh ring exposure landing each day. Card-testing rings lift on Friday/weekend nights; bust-out clusters cause the broader spikes.');
-  m.appendChild(cTime.wrap);
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
-  const traces = archOrder.map(a => ({
+    'Stacked area shows fresh ring exposure landing each day. Bust-out clusters cause the largest single-day spikes.');
+  r2t.appendChild(cTime.wrap);
+  Plotly.newPlot(cTime.plot, archOrder.map(a => ({
     x: dates,
     y: dates.map((_, di) =>
       RINGS.filter(r => r.arch === a).reduce((s, r) => s + (r.daily_dollars[di] || 0), 0)
     ),
     type: 'scatter', mode: 'lines', stackgroup: 'one',
-    name: ARCH_LABEL[a],
-    line: { width: 0 },
-    fillcolor: COLORS[a],
-  }));
-  Plotly.newPlot(cTime.plot, traces, baseLayout({
-    yaxis: { title: '$ exposure / day', tickformat: '$,.0s' },
-    height: 380,
+    name: ARCH_LABEL[a], line: { width: 0 }, fillcolor: COLORS[a],
+  })), baseLayout({ yaxis: { title: '$ / day', tickformat: '$,.0s' }, height: 360 }), CFG);
+
+  const cCount = chartCard('Daily transaction count by archetype',
+    'Same data, different lens. Card-testing rings dominate transaction count even though their $ exposure is tiny; bust-out is the inverse.');
+  r2t.appendChild(cCount.wrap);
+  Plotly.newPlot(cCount.plot, archOrder.map(a => ({
+    x: dates,
+    y: dates.map((_, di) =>
+      RINGS.filter(r => r.arch === a).reduce((s, r) => s + (r.daily_tx_count[di] || 0), 0)
+    ),
+    type: 'scatter', mode: 'lines', stackgroup: 'one',
+    name: ARCH_LABEL[a], line: { width: 0 }, fillcolor: COLORS[a],
+    showlegend: false,
+  })), baseLayout({ yaxis: { title: 'tx / day' }, height: 360 }), CFG);
+  m.appendChild(r2t);
+
+  // Model coverage by archetype
+  const cCov = chartCard('Model AUC and recall @ 2% by archetype',
+    'How well the production model catches each archetype. Card-testing is easy (high velocity, fail patterns). First-party and refund fraud are the hard tails — the model barely beats the base rate on those.');
+  m.appendChild(cCov.wrap);
+  const aucByArch = archOrder.map(a => {
+    const rs = RINGS.filter(r => r.arch === a);
+    return rs.length ? rs.reduce((s, r) => s + r.model_auc, 0) / rs.length : 0;
+  });
+  const recByArch = archOrder.map(a => {
+    const rs = RINGS.filter(r => r.arch === a);
+    return rs.length ? rs.reduce((s, r) => s + r.model_recall_2pct, 0) / rs.length : 0;
+  });
+  Plotly.newPlot(cCov.plot, [
+    { x: archOrder.map(a => ARCH_LABEL[a]), y: aucByArch, type: 'bar', name: 'mean AUC',
+      marker: { color: archOrder.map(a => COLORS[a]) } },
+    { x: archOrder.map(a => ARCH_LABEL[a]), y: recByArch, type: 'bar', name: 'recall @ 2%', yaxis: 'y2',
+      marker: { color: '#94a3b8', opacity: 0.7 } },
+  ], baseLayout({
+    yaxis: { title: 'mean AUC', range: [0.5, 1.0] },
+    yaxis2: { title: 'recall @ 2%', overlaying: 'y', side: 'right', tickformat: '.0%', range: [0, 1] },
+    barmode: 'group', height: 340,
+    shapes: [{ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.7, y1: 0.7,
+               line: { color: '#cbd5e1', width: 1, dash: 'dash' } }],
   }), CFG);
 
   // Right side: status distribution + archetype distribution side by side
@@ -696,7 +830,7 @@ ROUTES['catalog'] = () => {
       <thead><tr>${cols.map(([k, l]) => `
         <th data-k="${k}">${l}${catalogState.sort === k ? `<span class="arr">${dir < 0 ? '▼' : '▲'}</span>` : ''}</th>
       `).join('')}</tr></thead>
-      <tbody>${r.slice(0, 200).map(x => `
+      <tbody>${r.slice(0, 500).map(x => `
         <tr data-ring="${x.id}">
           <td><span class="ring-id">${x.id}</span></td>
           <td>${archPill(x.arch)}</td>
@@ -803,10 +937,23 @@ ROUTES['focus'] = (params) => {
     height: 480, margin: { t: 20, r: 20, b: 20, l: 20 },
   }), CFG);
 
-  // Daily $ timeline for this ring
+  // KPIs for model coverage on this ring
+  const covKpis = el('div', 'kpis');
+  const aucKlass = ring.model_auc >= 0.8 ? 'kpi-good' : ring.model_auc >= 0.65 ? 'kpi-warn' : 'kpi-bad';
+  const recKlass = ring.model_recall_2pct >= 0.5 ? 'kpi-good' : ring.model_recall_2pct >= 0.25 ? 'kpi-warn' : 'kpi-bad';
+  covKpis.innerHTML = `
+    <div class="kpi ${aucKlass}"><div class="kpi-l">Model AUC on this ring</div><div class="kpi-v">${ring.model_auc.toFixed(3)}</div><div class="kpi-s">archetype baseline ${ARCH_TPL[ring.arch].baseline_auc.toFixed(2)}</div></div>
+    <div class="kpi ${recKlass}"><div class="kpi-l">Recall @ 2% depth</div><div class="kpi-v">${(ring.model_recall_2pct * 100).toFixed(0)}%</div><div class="kpi-s">of ring's fraud captured at policy threshold</div></div>
+    <div class="kpi"><div class="kpi-l">Mean model score</div><div class="kpi-v">${ring.mean_score.toFixed(3)}</div><div class="kpi-s">across ring transactions</div></div>
+    <div class="kpi"><div class="kpi-l">Total transactions</div><div class="kpi-v">${ring.total_tx.toLocaleString()}</div><div class="kpi-s">over ring lifetime</div></div>
+  `;
+  m.appendChild(covKpis);
+
+  // Side-by-side: $ exposure and tx count timelines
+  const r2 = el('div', 'row2');
   const cTl = chartCard(`Daily $ exposure timeline`,
     `Ring lifetime: ${dates[ring.first_day]} → ${dates[ring.last_day]} · peak around ${dates[ring.peak_day]}.`);
-  m.appendChild(cTl.wrap);
+  r2.appendChild(cTl.wrap);
   Plotly.newPlot(cTl.plot, [
     { x: dates, y: ring.daily_dollars, type: 'scatter', mode: 'lines', fill: 'tozeroy',
       line: { color: COLORS[ring.arch], width: 2 }, fillcolor: COLORS[ring.arch] + '33',
@@ -816,15 +963,59 @@ ROUTES['focus'] = (params) => {
   ], baseLayout({
     yaxis: { title: '$ exposure', tickformat: '$,.0s' },
     yaxis2: { title: 'alerts', overlaying: 'y', side: 'right' },
+    height: 280,
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: dates[ring.peak_day], x1: dates[ring.peak_day],
+               y0: 0, y1: 1, line: { color: '#ef4444', width: 1, dash: 'dash' } }],
+    annotations: [{ x: dates[ring.peak_day], y: 1.02, xref: 'x', yref: 'paper', text: 'peak',
+                    showarrow: false, font: { color: '#ef4444', size: 10 }, xanchor: 'center' }],
+  }), CFG);
+
+  const cTx = chartCard(`Daily transaction count`,
+    `Tx count tells a different story than dollars — card-test rings flatline on $ but spike on count.`);
+  r2.appendChild(cTx.wrap);
+  Plotly.newPlot(cTx.plot, [
+    { x: dates, y: ring.daily_tx_count, type: 'scatter', mode: 'lines', fill: 'tozeroy',
+      line: { color: COLORS[ring.arch], width: 2 }, fillcolor: COLORS[ring.arch] + '22',
+      name: 'tx count', hovertemplate: '%{x}<br>%{y} tx<extra></extra>' },
+  ], baseLayout({
+    yaxis: { title: 'transactions / day' }, height: 280, showlegend: false,
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper', x0: dates[ring.peak_day], x1: dates[ring.peak_day],
+               y0: 0, y1: 1, line: { color: '#ef4444', width: 1, dash: 'dash' } }],
+  }), CFG);
+  m.appendChild(r2);
+
+  // Model performance over the ring's lifetime: recall + mean score
+  const cMP = chartCard('Model performance over ring lifetime',
+    'Daily recall @ 2% and mean model score on this ring\'s transactions. A ring with high $ but low recall is a blind spot worth investigating.');
+  m.appendChild(cMP.wrap);
+  Plotly.newPlot(cMP.plot, [
+    { x: dates, y: ring.daily_recall, type: 'scatter', mode: 'lines',
+      line: { color: COLORS.bad, width: 2 }, name: 'recall @ 2%',
+      connectgaps: false, hovertemplate: '%{x}<br>recall %{y:.0%}<extra></extra>' },
+    { x: dates, y: ring.daily_avg_score, type: 'scatter', mode: 'lines', yaxis: 'y2',
+      line: { color: COLORS.accent, width: 2, dash: 'dot' }, name: 'mean score',
+      connectgaps: false, hovertemplate: '%{x}<br>score %{y:.3f}<extra></extra>' },
+  ], baseLayout({
+    yaxis: { title: 'recall', tickformat: '.0%', range: [0, 1] },
+    yaxis2: { title: 'mean score', overlaying: 'y', side: 'right', range: [0, 1] },
     height: 300,
-    shapes: [
-      { type: 'line', xref: 'x', yref: 'paper', x0: dates[ring.peak_day], x1: dates[ring.peak_day],
-        y0: 0, y1: 1, line: { color: '#ef4444', width: 1, dash: 'dash' } },
-    ],
-    annotations: [
-      { x: dates[ring.peak_day], y: 1.02, xref: 'x', yref: 'paper', text: 'peak',
-        showarrow: false, font: { color: '#ef4444', size: 10 }, xanchor: 'center' },
-    ],
+  }), CFG);
+
+  // Feature signals for this ring
+  const cFS = chartCard('Top features lighting up on this ring',
+    'Per-ring feature signal strengths derived from the archetype profile and per-ring noise. These are the features the production model leans on most when it does catch this ring.');
+  m.appendChild(cFS.wrap);
+  Plotly.newPlot(cFS.plot, [{
+    x: ring.feature_signal.map(f => f.strength),
+    y: ring.feature_signal.map(f => f.name),
+    type: 'bar', orientation: 'h',
+    marker: { color: COLORS[ring.arch] },
+    text: ring.feature_signal.map(f => f.strength.toFixed(2)),
+    textposition: 'outside',
+  }], baseLayout({
+    xaxis: { title: 'signal strength', range: [0, 1] },
+    yaxis: { autorange: 'reversed' },
+    margin: { t: 20, r: 60, b: 46, l: 200 }, height: 280, showlegend: false,
   }), CFG);
 
   // Detection method + ring-level callout
@@ -863,7 +1054,7 @@ ROUTES['graph'] = () => {
   });
 
   // Group nodes by archetype for separate traces (legend)
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const archOrder = ARCH_ORDER;
   const nodeTraces = archOrder.map(a => {
     const ns = MACRO.filter(n => n.arch === a);
     const sizes = ns.map(n => 6 + Math.min(40, Math.sqrt(n.$exp) / 25));
@@ -888,8 +1079,8 @@ ROUTES['graph'] = () => {
   ];
 
   Plotly.newPlot(c.plot, traces, baseLayout({
-    xaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-30, 30] },
-    yaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-30, 30], scaleanchor: 'x' },
+    xaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-58, 58] },
+    yaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-58, 58], scaleanchor: 'x' },
     height: 600, margin: { t: 30, r: 20, b: 60, l: 20 },
   }), CFG);
 
@@ -913,7 +1104,7 @@ ROUTES['archetype'] = () => {
     `Each archetype has a different operational signature. The detection feature that surfaces a card-testing ring (high card-per-device ratio) is useless for a mule network (where the ratio is roughly 1). Knowing what kind of ring you're looking at determines what you should look for.`
   ));
 
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const archOrder = ARCH_ORDER;
   // KPI tiles per archetype
   const kpis = el('div', 'kpis');
   kpis.innerHTML = archOrder.map(a => {
@@ -976,20 +1167,242 @@ ROUTES['archetype'] = () => {
   tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Archetype reference</div></div>`;
   const tbl = el('table', 'rt-tbl');
   const refs = {
-    syn_id:   { signature: 'Many "different" accounts share device entropy and behavioral biometrics; address-match scores low.', signal: 'Behavioral biometrics, device fingerprint clustering, address verification.', payoff: 'Mid-term ($85K avg), prevention before bust-out.' },
-    mule:     { signature: 'Many accounts, varied merchants, low per-tx amount, synchronized timing.', signal: 'Merchant graph + time-window clustering. Per-account features look fine.', payoff: 'High-volume ($220K avg), AML/regulatory risk.' },
-    card_test: { signature: 'Few devices/IPs, very many cards, small amounts at a small set of test merchants.', signal: 'Card-per-device ratio; rapid 3DS-fail patterns.', payoff: 'Lower direct exposure ($12K avg) but loses are downstream — tested cards used elsewhere.' },
-    bust_out:  { signature: 'Long quiet history then sudden high-amount burst across newly issued credit limits.', signal: 'Lifecycle shape — utilization curve, not per-tx features.', payoff: 'Highest avg exposure ($340K), often discovered post-loss.' },
-    ato:       { signature: 'Compromised legitimate accounts share device fingerprints / IP ranges; behaviors deviate from baseline.', signal: 'Device-account graph + behavioral baseline deviation.', payoff: 'High customer impact, reputational risk.' },
+    syn_id:        { signature: 'Many "different" accounts share device entropy and behavioral biometrics; address-match scores low.', signal: 'Behavioral biometrics, device fingerprint clustering, address verification.', payoff: 'Mid-term ($85K avg), prevention before bust-out.' },
+    mule:          { signature: 'Many accounts, varied merchants, low per-tx amount, synchronized timing.', signal: 'Merchant graph + time-window clustering. Per-account features look fine.', payoff: 'High-volume ($220K avg), AML/regulatory risk.' },
+    card_test:     { signature: 'Few devices/IPs, very many cards, small amounts at a small set of test merchants.', signal: 'Card-per-device ratio; rapid 3DS-fail patterns.', payoff: 'Lower direct exposure ($12K avg) but losses are downstream — tested cards used elsewhere.' },
+    bust_out:      { signature: 'Long quiet history then sudden high-amount burst across newly issued credit limits.', signal: 'Lifecycle shape — utilization curve, not per-tx features.', payoff: 'Highest avg exposure ($340K), often discovered post-loss.' },
+    ato:           { signature: 'Compromised legitimate accounts share device fingerprints / IP ranges; behaviors deviate from baseline.', signal: 'Device-account graph + behavioral baseline deviation.', payoff: 'High customer impact, reputational risk.' },
+    triangulation: { signature: 'Attacker-controlled fake merchants accept stolen cards as a laundering layer; cards then funnel into real merchants.', signal: 'Merchant lifecycle (very young), MCC inconsistency, embedding outliers.', payoff: 'Mid-term ($195K avg). Hard to spot without merchant-onboarding telemetry.' },
+    refund:        { signature: 'Coordinated chargebacks/refunds — rings that buy, "return", and keep, or exploit double-refund rails.', signal: 'High refund-to-purchase ratio per account, merchant-policy gaming patterns.', payoff: 'Lower per-ring ($62K) but model AUC ~0.58 — the easiest archetype to miss.' },
+    first_party:   { signature: 'Legitimately-onboarded accounts that intend to default. Identity is real; intent is the fraud.', signal: 'Origination features + repayment behavior; not transaction-level.', payoff: '$105K avg. Hardest to model from tx data alone (AUC ~0.55).' },
+    friendly:      { signature: 'Coordinated chargeback abuse — real customers initiating disputes en masse, often after digital-goods purchases.', signal: 'Cross-account chargeback ratio + merchant-segment correlation.', payoff: '$42K avg. AUC ~0.62 — better than first-party but still rough.' },
+    promo_abuse:   { signature: 'Many fake-thin accounts on shared infrastructure exploiting signup bonuses, referral codes, or first-purchase discounts.', signal: 'Account age + device reuse + promotional-code clustering.', payoff: '$28K direct, but the indirect cost is signup CAC contamination.' },
   };
   tbl.innerHTML = `
-    <thead><tr><th>Archetype</th><th>Operational signature</th><th>Detection signal</th><th>Why it matters</th></tr></thead>
-    <tbody>${archOrder.map(a => `
-      <tr><td>${archPill(a)}</td><td>${refs[a].signature}</td><td>${refs[a].signal}</td><td>${refs[a].payoff}</td></tr>
-    `).join('')}</tbody>
+    <thead><tr><th>Archetype</th><th>Operational signature</th><th>Detection signal</th><th>Why it matters</th><th>Model AUC</th></tr></thead>
+    <tbody>${archOrder.map(a => {
+      const aucBaseline = ARCH_TPL[a].baseline_auc;
+      const aucKls = aucBaseline >= 0.8 ? 'pill-good' : aucBaseline >= 0.65 ? 'pill-warn' : 'pill-bad';
+      return `<tr><td>${archPill(a)}</td><td>${refs[a].signature}</td><td>${refs[a].signal}</td><td>${refs[a].payoff}</td><td><span class="pill ${aucKls}">${aucBaseline.toFixed(2)}</span></td></tr>`;
+    }).join('')}</tbody>
   `;
   tblWrap.appendChild(tbl);
   m.appendChild(tblWrap);
+};
+
+/* -------------------- MODEL COVERAGE -------------------- */
+ROUTES['coverage'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Model coverage',
+    `How well the production model predicts each ring. The metric that matters here isn't aggregate AUC — it's <em>per-ring</em> performance, because rings the model misses are exactly the ones that drive losses you can't enforce against. The scatter below is the headline: rings with high $ exposure and low AUC are blind spots.`
+  ));
+
+  const wellCovered = RINGS.filter(r => r.model_auc >= 0.80).length;
+  const moderateCov = RINGS.filter(r => r.model_auc >= 0.65 && r.model_auc < 0.80).length;
+  const blindSpots  = RINGS.filter(r => r.model_auc < 0.65).length;
+  const blindExp = RINGS.filter(r => r.model_auc < 0.65).reduce((s, r) => s + r.$exp, 0);
+  const meanAuc = RINGS.reduce((s, r) => s + r.model_auc, 0) / RINGS.length;
+  const meanRecall = RINGS.reduce((s, r) => s + r.model_recall_2pct, 0) / RINGS.length;
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi kpi-good"><div class="kpi-l">Well-covered (AUC ≥ 0.80)</div><div class="kpi-v">${wellCovered}</div><div class="kpi-s">${(wellCovered/N_RINGS*100).toFixed(0)}% of rings</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">Moderate (0.65–0.80)</div><div class="kpi-v">${moderateCov}</div><div class="kpi-s">${(moderateCov/N_RINGS*100).toFixed(0)}%</div></div>
+    <div class="kpi kpi-bad"><div class="kpi-l">Blind spots (AUC &lt; 0.65)</div><div class="kpi-v">${blindSpots}</div><div class="kpi-s">${fmt$(blindExp)} exposure</div></div>
+    <div class="kpi kpi-accent"><div class="kpi-l">Portfolio mean AUC</div><div class="kpi-v">${meanAuc.toFixed(3)}</div><div class="kpi-s">recall @ 2%: ${(meanRecall * 100).toFixed(0)}%</div></div>
+  `;
+  m.appendChild(kpis);
+
+  // Scatter: $ exposure × model AUC, colored by archetype
+  const cScat = chartCard('Per-ring exposure × model AUC',
+    'Each dot is one ring. Size scales with transaction count. Bottom-right cluster (high $ + low AUC) is where to look first — these are the rings the model can\'t catch and that hurt the most.');
+  m.appendChild(cScat.wrap);
+  Plotly.newPlot(cScat.plot, ARCH_ORDER.map(a => {
+    const rs = RINGS.filter(r => r.arch === a);
+    return {
+      x: rs.map(r => r.$exp),
+      y: rs.map(r => r.model_auc),
+      mode: 'markers', type: 'scatter', name: ARCH_LABEL[a],
+      customdata: rs.map(r => [r.id, r.total_tx]),
+      hovertemplate: '<b>%{customdata[0]}</b><br>$ %{x:,.0f}<br>AUC %{y:.3f}<br>%{customdata[1]} tx<extra></extra>',
+      marker: {
+        size: rs.map(r => Math.min(28, 4 + Math.sqrt(r.total_tx) / 4)),
+        color: COLORS[a], opacity: 0.78, line: { color: 'white', width: 1 },
+      },
+    };
+  }), baseLayout({
+    xaxis: { title: '$ exposure', tickformat: '$,.0s', type: 'log' },
+    yaxis: { title: 'model AUC on this ring', range: [0.5, 1.0] },
+    height: 460,
+    shapes: [
+      { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.65, y1: 0.65,
+        line: { color: COLORS.bad, width: 1, dash: 'dash' } },
+      { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: 0.80, y1: 0.80,
+        line: { color: COLORS.good, width: 1, dash: 'dash' } },
+    ],
+    annotations: [
+      { xref: 'paper', x: 0.99, y: 0.65, text: 'blind-spot threshold', showarrow: false,
+        font: { color: COLORS.bad, size: 10 }, xanchor: 'right' },
+    ],
+  }), CFG);
+  cScat.plot.on('plotly_click', e => {
+    if (!e.points || !e.points.length) return;
+    const id = e.points[0].customdata[0]; if (id) navigate('focus', { r: id });
+  });
+
+  // Side-by-side: AUC distribution (box) and recall trend over portfolio age
+  const r2 = el('div', 'row2');
+  const cBox = chartCard('Per-archetype AUC distribution', 'Box = IQR of per-ring AUC; whiskers are the spread. Tight boxes mean the archetype is uniformly easy or hard.');
+  r2.appendChild(cBox.wrap);
+  Plotly.newPlot(cBox.plot, ARCH_ORDER.map(a => ({
+    y: RINGS.filter(r => r.arch === a).map(r => r.model_auc),
+    type: 'box', name: ARCH_LABEL[a],
+    marker: { color: COLORS[a] }, boxmean: true,
+  })), baseLayout({
+    yaxis: { title: 'model AUC', range: [0.5, 1.0] },
+    showlegend: false, height: 360,
+  }), CFG);
+
+  const cRec = chartCard('Daily portfolio recall @ 2%', 'Mean per-day recall across all active rings, weighted by transaction volume. The flat baseline tells you what threshold-based policy is actually catching today.');
+  r2.appendChild(cRec.wrap);
+  const dailyPortfolioRecall = dates.map((d, di) => {
+    let txTot = 0, recWeighted = 0;
+    RINGS.forEach(r => {
+      const tx = r.daily_tx_count[di] || 0;
+      const rec = r.daily_recall[di];
+      if (tx > 0 && rec != null) { txTot += tx; recWeighted += rec * tx; }
+    });
+    return txTot > 0 ? recWeighted / txTot : null;
+  });
+  Plotly.newPlot(cRec.plot, [{
+    x: dates, y: dailyPortfolioRecall, type: 'scatter', mode: 'lines',
+    line: { color: COLORS.bad, width: 2.4 }, fill: 'tozeroy', fillcolor: 'rgba(239,68,68,0.10)',
+    connectgaps: false, name: 'recall @ 2%',
+  }], baseLayout({
+    yaxis: { title: 'recall', tickformat: '.0%', range: [0, 1] },
+    height: 360, showlegend: false,
+  }), CFG);
+  m.appendChild(r2);
+
+  // Top blind-spots table
+  const blindSorted = [...RINGS].filter(r => r.model_auc < 0.7).sort((a, b) => b.$exp - a.$exp).slice(0, 25);
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Top 25 blind spots — high $ + low AUC</div><div class="chart-s">Highest-priority rings for model investment. Click to drill into ring focus.</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  tbl.innerHTML = `
+    <thead><tr><th>Ring</th><th>Archetype</th><th>$ exposure</th><th>Total tx</th><th>Model AUC</th><th>Recall @ 2%</th><th>Mean score</th><th>Status</th></tr></thead>
+    <tbody>${blindSorted.map(r => `
+      <tr data-ring="${r.id}">
+        <td><span class="ring-id">${r.id}</span></td>
+        <td>${archPill(r.arch)}</td>
+        <td>${fmt$(r.$exp)}</td>
+        <td>${fmtN(r.total_tx)}</td>
+        <td>${r.model_auc.toFixed(3)}</td>
+        <td>${(r.model_recall_2pct * 100).toFixed(0)}%</td>
+        <td>${r.mean_score.toFixed(3)}</td>
+        <td>${statusPill(r.status)}</td>
+      </tr>`).join('')}</tbody>
+  `;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+  tbl.querySelectorAll('tr[data-ring]').forEach(tr => {
+    tr.onclick = () => navigate('focus', { r: tr.dataset.ring });
+  });
+};
+
+/* -------------------- FEATURE SIGNALS -------------------- */
+ROUTES['signals'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Feature signals',
+    `Per-archetype map of which features carry signal. Each archetype "lights up" different features — the velocity stack catches card-testing, behavioral biometrics catch ATO, lifecycle features catch bust-out. Knowing which features matter for which archetype tells you where to invest in feature engineering and where to stop wasting effort.`
+  ));
+
+  // Build matrix: rows = features in pool, cols = archetypes, values = mean strength of feature for rings of that archetype
+  const featByArch = {};
+  ARCH_ORDER.forEach(a => {
+    featByArch[a] = {};
+    FEATURE_POOL.forEach(f => featByArch[a][f] = 0);
+    const rs = RINGS.filter(r => r.arch === a);
+    rs.forEach(r => {
+      r.feature_signal.forEach(({ name, strength }) => {
+        if (featByArch[a][name] != null) featByArch[a][name] += strength;
+      });
+    });
+    Object.keys(featByArch[a]).forEach(f => {
+      featByArch[a][f] = rs.length ? featByArch[a][f] / rs.length : 0;
+    });
+  });
+
+  // Sort features by total signal across archetypes (most "active" features first)
+  const featTotal = FEATURE_POOL.map(f => ({
+    f, total: ARCH_ORDER.reduce((s, a) => s + featByArch[a][f], 0),
+  })).sort((a, b) => b.total - a.total);
+  const sortedFeats = featTotal.map(x => x.f);
+
+  // Heatmap
+  const cHeat = chartCard('Feature × archetype signal strength',
+    'Cells show mean per-ring feature-signal strength. Darker = the feature lights up reliably for rings of that archetype. Sparse rows mean the feature only matters for one or two archetypes — those features should be evaluated against the cohorts they actually serve.');
+  m.appendChild(cHeat.wrap);
+  const z = sortedFeats.map(f => ARCH_ORDER.map(a => featByArch[a][f]));
+  Plotly.newPlot(cHeat.plot, [{
+    z, x: ARCH_ORDER.map(a => ARCH_LABEL[a]), y: sortedFeats,
+    type: 'heatmap', colorscale: 'Purples', zmin: 0, zmax: 0.9,
+    hovertemplate: '<b>%{y}</b><br>%{x}<br>signal %{z:.2f}<extra></extra>',
+  }], baseLayout({
+    xaxis: { tickangle: -25 },
+    margin: { t: 30, r: 30, b: 90, l: 220 },
+    height: 600,
+  }), CFG);
+
+  // Side-by-side: per-archetype top-features and per-feature multi-archetype hits
+  const r2 = el('div', 'row2');
+  const cTopByArch = chartCard('Top 5 features per archetype',
+    'Quick reference: each archetype\'s strongest signals. The top feature for one archetype is often near the bottom for another — there is no universal "best" feature.');
+  r2.appendChild(cTopByArch.wrap);
+  const traces = ARCH_ORDER.slice(0, 6).map((a, i) => {
+    const top = Object.entries(featByArch[a]).sort((x, y) => y[1] - x[1]).slice(0, 5);
+    return {
+      x: top.map(([_, v]) => v),
+      y: top.map(([f, _]) => f.length > 22 ? f.slice(0, 20) + '…' : f),
+      type: 'bar', orientation: 'h', name: ARCH_LABEL[a],
+      marker: { color: COLORS[a] },
+      visible: i === 0 ? true : 'legendonly',
+    };
+  });
+  Plotly.newPlot(cTopByArch.plot, traces, baseLayout({
+    xaxis: { title: 'signal', range: [0, 1] },
+    yaxis: { autorange: 'reversed' },
+    height: 360, margin: { t: 20, r: 20, b: 46, l: 180 },
+    legend: { orientation: 'v', x: 1.02, y: 1, font: { size: 10 } },
+  }), CFG);
+
+  const cBreadth = chartCard('Feature breadth — how many archetypes light up each feature',
+    'Features at the top "light up" across many archetypes (broad-spectrum signals). Features at the bottom only fire for one or two archetypes (specialist signals — keep them but don\'t expect them to generalize).');
+  r2.appendChild(cBreadth.wrap);
+  const breadth = sortedFeats.map(f => ({
+    f,
+    archCount: ARCH_ORDER.filter(a => featByArch[a][f] > 0.4).length,
+    maxStrength: Math.max(...ARCH_ORDER.map(a => featByArch[a][f])),
+  })).sort((a, b) => b.archCount - a.archCount).slice(0, 18);
+  Plotly.newPlot(cBreadth.plot, [{
+    x: breadth.map(b => b.archCount),
+    y: breadth.map(b => b.f),
+    type: 'bar', orientation: 'h',
+    marker: { color: breadth.map(b => b.archCount >= 5 ? COLORS.good : b.archCount >= 3 ? COLORS.warn : COLORS.accent) },
+    text: breadth.map(b => `${b.archCount} archs`),
+    textposition: 'outside',
+  }], baseLayout({
+    xaxis: { title: '# archetypes where signal > 0.4' },
+    yaxis: { autorange: 'reversed' }, showlegend: false,
+    margin: { t: 20, r: 60, b: 46, l: 180 }, height: 360,
+  }), CFG);
+  m.appendChild(r2);
+
+  m.appendChild(makeCallout('Reading this together with model coverage',
+    `Archetypes with low model AUC (refund, first-party, friendly) tend to have signal vectors that overlap with archetypes the model already handles — meaning the existing features can\'t separate them. New feature investment should target the archetype-specific signatures: chargeback ratios for refund/friendly, origination/repayment features for first-party, merchant-onboarding telemetry for triangulation.`,
+    'info'));
 };
 
 /* -------------------- CROSS-RING OVERLAP -------------------- */
@@ -1010,7 +1423,7 @@ ROUTES['overlap'] = () => {
   m.appendChild(kpis);
 
   // Heatmap: archetype x archetype overlap counts
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const archOrder = ARCH_ORDER;
   const matrix = archOrder.map(() => archOrder.map(() => 0));
   overlapEdges.forEach(e => {
     const ra = RINGS.find(r => r.id === e.a);
@@ -1083,7 +1496,7 @@ ROUTES['growth'] = () => {
   const c2 = chartCard('Cumulative $ exposure per archetype',
     'Steeper-curve archetypes are the ones expanding fastest. Plateaus mean enforcement landed.');
   m.appendChild(c2.wrap);
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const archOrder = ARCH_ORDER;
   const traces = archOrder.map(a => {
     let cum = 0;
     return {
@@ -1129,7 +1542,7 @@ ROUTES['detection'] = () => {
 
   // Method × archetype heatmap
   const methods = DETECTION_METHODS;
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const archOrder = ARCH_ORDER;
   const matrix = methods.map(meth =>
     archOrder.map(arch => RINGS.filter(r => r.detection === meth && r.arch === arch).length)
   );
@@ -1233,7 +1646,7 @@ ROUTES['impact'] = () => {
 
   const cB = chartCard('Exposure vs capture by archetype', '');
   r2.appendChild(cB.wrap);
-  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const archOrder = ARCH_ORDER;
   Plotly.newPlot(cB.plot, [
     { x: archOrder.map(a => ARCH_LABEL[a]),
       y: archOrder.map(a => RINGS.filter(r => r.arch === a).reduce((s, r) => s + r.$exp, 0)),
