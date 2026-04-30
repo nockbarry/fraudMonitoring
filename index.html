@@ -53,7 +53,7 @@ a:hover { color: var(--fg); }
   letter-spacing: 1.5px; font-weight: 700; margin: 40px 0 16px;
 }
 
-.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 @media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
 .card {
   background: var(--bg-2);
@@ -148,6 +148,7 @@ footer a { color: var(--dim); }
       <span><strong>630k</strong> transactions</span>
       <span><strong>84</strong> engineered features</span>
       <span><strong>2</strong> trained models (GBM champion, LR challenger)</span>
+      <span><strong>42</strong> synthetic fraud rings across 5 archetypes</span>
       <span><strong>Regime shift</strong> planted at week 8</span>
     </div>
   </header>
@@ -210,6 +211,21 @@ footer a { color: var(--dim); }
       <div class="links">
         <span>Open dashboard</span>
         <a href="./stability_monitoring_hub.html">original synthetic demo</a>
+      </div>
+    </a>
+
+    <a class="card" href="./fraud_rings_hub.html">
+      <div class="num">04 / fraud rings</div>
+      <h3 class="t">Fraud Rings Hub</h3>
+      <p class="d">
+        Network-driven view of coordinated fraud activity. Catalog of detected
+        rings, archetype breakdown (synthetic-ID / mule / card-testing /
+        bust-out / ATO), interactive ring focus pages with entity network graphs,
+        cross-ring infrastructure overlap, growth &amp; decay, detection-method
+        analysis, Pareto impact, and an analyst triage queue.
+      </p>
+      <div class="links">
+        <span>Open dashboard</span>
       </div>
     </a>
   </div>

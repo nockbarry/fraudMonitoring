@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fraud Rings Hub · Fraud Demo v1</title>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>
+:root {
+  --sb-bg: #0f172a; --sb-bg-2: #1e293b; --sb-fg: #cbd5e1; --sb-dim: #64748b;
+  --accent: #6366f1; --accent-bg: rgba(99,102,241,0.16);
+  --bg: #f6f7fb; --card: #ffffff; --border: #e4e7ec;
+  --text: #0f172a; --dim: #64748b;
+  --good: #10b981; --warn: #f59e0b; --bad: #ef4444;
+  --syn-id: #a855f7;
+  --mule: #0ea5e9;
+  --card-test: #f59e0b;
+  --bust-out: #ef4444;
+  --ato: #14b8a6;
+  --acct: #6366f1;
+  --card-color: #f59e0b;
+  --device: #10b981;
+  --ip: #ec4899;
+  --merch: #94a3b8;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  color: var(--text); background: var(--bg);
+  font-size: 14px; display: flex; overflow: hidden;
+}
+.sidebar { width: 280px; background: var(--sb-bg); color: var(--sb-fg); flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
+.sb-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--sb-bg-2); }
+.sb-title { font-size: 15px; font-weight: 700; color: #f1f5f9; margin: 0; display: flex; align-items: center; gap: 8px; }
+.sb-title::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); display: inline-block; }
+.sb-sub { font-size: 11px; color: var(--sb-dim); margin-top: 4px; letter-spacing: 0.4px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.sb-hublink { display: block; font-size: 11px; color: var(--sb-dim); padding: 8px 20px; text-decoration: none; border-bottom: 1px solid var(--sb-bg-2); }
+.sb-hublink:hover { color: var(--accent); }
+.sb-hublink .arrow { float: right; }
+.nav { flex: 1; overflow-y: auto; padding: 6px 0 10px; }
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.nav-section { margin-bottom: 1px; }
+.nav-head { display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 18px; cursor: pointer; user-select: none; font-size: 12.5px; font-weight: 600; color: #e2e8f0; }
+.nav-head:hover { background: rgba(255,255,255,0.04); }
+.nav-head .chev { margin-left: auto; color: var(--sb-dim); font-size: 9px; transition: transform 0.15s; }
+.nav-section.collapsed .chev { transform: rotate(-90deg); }
+.nav-section.collapsed .nav-items { display: none; }
+.nav-items { padding: 2px 0 6px; }
+.nav-item { display: flex; align-items: center; gap: 8px; padding: 6px 18px 6px 42px; cursor: pointer; font-size: 12.5px; color: var(--sb-fg); border-left: 2px solid transparent; }
+.nav-item:hover { background: rgba(255,255,255,0.04); color: #f1f5f9; }
+.nav-item.active { color: #f1f5f9; background: var(--accent-bg); border-left-color: var(--accent); font-weight: 500; }
+.nav-direct { padding: 9px 18px; cursor: pointer; font-size: 12.5px; color: #e2e8f0; font-weight: 600; border-left: 2px solid transparent; display: flex; gap: 10px; align-items: center; }
+.nav-direct:hover { background: rgba(255,255,255,0.04); }
+.nav-direct.active { background: var(--accent-bg); border-left-color: var(--accent); }
+.badge { font-size: 10px; padding: 1px 7px; border-radius: 10px; background: #334155; color: #cbd5e1; margin-left: auto; font-weight: 500; }
+.badge-accent { background: var(--accent-bg); color: #c7d2fe; }
+.badge-warn { background: #78350f; color: #fcd34d; }
+.badge-bad { background: #7f1d1d; color: #fca5a5; }
+.badge-good { background: #064e3b; color: #6ee7b7; }
+.sb-foot { padding: 12px 18px; border-top: 1px solid var(--sb-bg-2); font-size: 11px; color: var(--sb-dim); }
+
+.content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 56px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 16px; flex-shrink: 0; }
+.crumbs { font-size: 13px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+.crumbs strong { color: var(--text); font-weight: 600; }
+.crumbs .sep { color: #cbd5e1; }
+.tr { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--dim); }
+.tstat { display: flex; gap: 5px; align-items: center; }
+.tstat strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tstat-sep { color: #cbd5e1; }
+.main { flex: 1; overflow-y: auto; padding: 22px 24px; }
+.main::-webkit-scrollbar { width: 8px; }
+.main::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+.page-h { margin-bottom: 18px; }
+.page-t { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+.page-d { font-size: 13px; color: var(--dim); margin: 0; max-width: 880px; line-height: 1.55; }
+.page-d code { background: #eef2ff; color: #3730a3; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+.kpi { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 13px 16px; }
+.kpi-l { font-size: 11px; color: var(--dim); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px; }
+.kpi-v { font-size: 22px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.kpi-s { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+.kpi-accent { border-left: 3px solid var(--accent); }
+.kpi-warn { border-left: 3px solid var(--warn); }
+.kpi-bad { border-left: 3px solid var(--bad); }
+.kpi-good { border-left: 3px solid var(--good); }
+
+.chart-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; margin-bottom: 14px; }
+.chart-head { padding: 10px 14px 2px; }
+.chart-t { font-size: 13.5px; font-weight: 600; margin: 0; }
+.chart-s { font-size: 12px; color: var(--dim); margin-top: 2px; line-height: 1.45; }
+.chart-body { padding: 4px; }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.row13 { display: grid; grid-template-columns: 1fr 3fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 1100px) { .row2, .row3, .row13 { grid-template-columns: 1fr; } }
+
+.rt-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rt-tbl th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--dim); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border); letter-spacing: 0.4px; background: #f8fafc; cursor: pointer; user-select: none; }
+.rt-tbl th:hover { color: var(--accent); }
+.rt-tbl th .arr { font-size: 9px; margin-left: 3px; color: var(--accent); }
+.rt-tbl td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
+.rt-tbl tr { cursor: pointer; }
+.rt-tbl tr:hover td { background: #f8fafc; }
+.rt-tbl tr:last-child td { border-bottom: 0; }
+.rt-tbl .hl { background: #eef2ff; font-weight: 600; }
+.rt-tbl .ring-id { color: var(--accent); font-family: 'SF Mono', Menlo, Consolas, monospace; }
+
+.alert { display: flex; gap: 10px; padding: 10px 12px; border-left: 3px solid var(--warn); background: #fffbeb; border-radius: 4px; margin-bottom: 10px; font-size: 13px; line-height: 1.55; }
+.alert.bad { border-left-color: var(--bad); background: #fef2f2; }
+.alert.good { border-left-color: var(--good); background: #f0fdf4; }
+.alert.info { border-left-color: var(--accent); background: #eef2ff; }
+
+.pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.pill-good { background: #d1fae5; color: #065f46; }
+.pill-warn { background: #fef3c7; color: #92400e; }
+.pill-bad { background: #fee2e2; color: #991b1b; }
+.pill-accent { background: #e0e7ff; color: #3730a3; }
+.pill-syn-id { background: #f3e8ff; color: #6b21a8; }
+.pill-mule { background: #e0f2fe; color: #075985; }
+.pill-card-test { background: #fef3c7; color: #92400e; }
+.pill-bust-out { background: #fee2e2; color: #991b1b; }
+.pill-ato { background: #ccfbf1; color: #115e59; }
+.pill-status-active { background: #fee2e2; color: #991b1b; }
+.pill-status-monitoring { background: #fef3c7; color: #92400e; }
+.pill-status-blocked { background: #d1fae5; color: #065f46; }
+.pill-status-investigating { background: #e0e7ff; color: #3730a3; }
+
+.controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+.ctl { display: flex; align-items: center; gap: 8px; }
+.ctl label { font-size: 11px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.4px; }
+.ctl-radio { display: flex; gap: 4px; }
+.ctl-radio label { cursor: pointer; padding: 5px 10px; background: #f1f5f9; border-radius: 5px; font-size: 12px; color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 500; border: 1px solid transparent; }
+.ctl-radio label:hover { background: #e2e8f0; }
+.ctl-radio label.active { background: #1e293b; color: white; border-color: #1e293b; }
+.ctl-radio input { display: none; }
+.ctl input[type=text] { padding: 5px 10px; border: 1px solid var(--border); border-radius: 5px; outline: none; font-size: 13px; min-width: 200px; }
+.ctl input[type=text]:focus { border-color: var(--accent); }
+
+.callout { background: #f8fafc; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 12px 14px; margin: 8px 0 14px; font-size: 13px; line-height: 1.55; color: #334155; }
+.callout strong { color: var(--text); }
+.callout .ttl { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+
+/* Ring focus hero */
+.ring-hero { background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 60%); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; margin-bottom: 16px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.ring-hero-name { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.3px; flex: 1; }
+.ring-hero-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--dim); }
+.ring-hero-meta strong { color: var(--text); }
+.ring-hero-nav { display: flex; gap: 6px; align-items: center; }
+.ring-hero-nav button { font-size: 12px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: white; cursor: pointer; color: var(--text); }
+.ring-hero-nav button:hover:not(:disabled) { background: #f1f5f9; border-color: var(--accent); color: var(--accent); }
+.ring-hero-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.entity-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 1100px) { .entity-grid { grid-template-columns: repeat(2, 1fr); } }
+.entity-tile { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.entity-tile-l { font-size: 11px; color: var(--dim); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px; display: flex; align-items: center; gap: 6px; }
+.entity-tile-l::before { content: ''; width: 8px; height: 8px; border-radius: 50%; }
+.entity-tile-l.acct::before { background: var(--acct); }
+.entity-tile-l.card::before { background: var(--card-color); }
+.entity-tile-l.dev::before { background: var(--device); }
+.entity-tile-l.ip::before { background: var(--ip); }
+.entity-tile-l.merch::before { background: var(--merch); }
+.entity-tile-v { font-size: 22px; font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.entity-tile-s { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+
+@media (max-width: 720px) { .sidebar { width: 240px; } .tr { display: none; } }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-head">
+    <div class="sb-title">Fraud Rings</div>
+    <div class="sb-sub" id="sb-sub">network analysis · run 2026-04-29</div>
+  </div>
+  <a class="sb-hublink" href="./model_performance_hub_demo.html">Model Performance Hub <span class="arrow">→</span></a>
+  <a class="sb-hublink" href="./feature_analysis_hub_demo.html">Feature Analysis Hub <span class="arrow">→</span></a>
+  <a class="sb-hublink" href="./stability_monitoring_hub_demo.html">Stability &amp; Calibration Hub <span class="arrow">→</span></a>
+  <nav class="nav" id="nav"></nav>
+  <div class="sb-foot" id="sb-foot">synthetic demo · illustrative</div>
+</aside>
+
+<div class="content">
+  <div class="topbar">
+    <div class="crumbs" id="crumbs"></div>
+    <div class="tr" id="topstats"></div>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+/* ============================================================================
+   Seeded PRNG so synthetic story renders identically across reloads.
+   ============================================================================ */
+function mulberry32(seed) {
+  return function () {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const rng = mulberry32(20260429);
+
+const FONT = { family: 'Inter, -apple-system, Segoe UI, Roboto, sans-serif', size: 11, color: '#334155' };
+const CFG = { responsive: true, displayModeBar: false };
+const COLORS = {
+  syn_id: '#a855f7', mule: '#0ea5e9', card_test: '#f59e0b', bust_out: '#ef4444', ato: '#14b8a6',
+  acct: '#6366f1', card: '#f59e0b', dev: '#10b981', ip: '#ec4899', merch: '#94a3b8',
+  good: '#10b981', warn: '#f59e0b', bad: '#ef4444', accent: '#6366f1',
+  active: '#ef4444', monitoring: '#f59e0b', blocked: '#10b981', investigating: '#6366f1',
+};
+const ARCH_LABEL = {
+  syn_id:    'Synthetic ID',
+  mule:      'Mule network',
+  card_test: 'Card testing',
+  bust_out:  'Bust-out',
+  ato:       'ATO cluster',
+};
+
+/* ============================================================================
+   Generate synthetic ring data
+   ============================================================================ */
+const N_DAYS = 70;
+const START = new Date(Date.UTC(2026, 1, 19));    // 2026-02-19 → +70d ≈ 2026-04-29
+const dates = Array.from({ length: N_DAYS }, (_, i) => {
+  const d = new Date(START.getTime() + i * 86400000);
+  return d.toISOString().slice(0, 10);
+});
+
+// Archetype templates: ring size distribution + behavior fingerprint
+const ARCH_TPL = {
+  syn_id:    { count: 12, n_acct: [40, 12], n_card: [60, 18], n_dev: [10, 4], n_ip: [8, 3], $exp: [85_000, 42_000], shareDev: 0.65, shareIp: 0.55 },
+  mule:      { count: 9,  n_acct: [85, 22], n_card: [110, 30], n_dev: [60, 18], n_ip: [40, 14], $exp: [220_000, 85_000], shareDev: 0.18, shareIp: 0.12 },
+  card_test: { count: 8,  n_acct: [12, 5],  n_card: [320, 90], n_dev: [4, 2],  n_ip: [3, 1],  $exp: [12_000, 4_500], shareDev: 0.95, shareIp: 0.92 },
+  bust_out:  { count: 6,  n_acct: [22, 6],  n_card: [22, 6],   n_dev: [22, 6], n_ip: [18, 4], $exp: [340_000, 110_000], shareDev: 0.10, shareIp: 0.08 },
+  ato:       { count: 7,  n_acct: [55, 14], n_card: [55, 14],  n_dev: [3, 1],  n_ip: [4, 2],  $exp: [180_000, 60_000], shareDev: 0.98, shareIp: 0.88 },
+};
+
+const STATUSES = ['active', 'monitoring', 'investigating', 'blocked'];
+const STATUS_PROB = [0.32, 0.28, 0.18, 0.22];
+
+const DETECTION_METHODS = [
+  'shared_device', 'shared_ip_behavior', 'velocity_cluster', 'embedding_similarity',
+  'graph_clustering', 'device_fingerprint_match', 'analyst_referral', 'behavioral_outlier',
+];
+
+const RINGS = [];
+let ringCounter = 0;
+let entityCounter = { acct: 0, card: 0, dev: 0, ip: 0, merch: 0 };
+
+function pickStatus() {
+  let r = rng();
+  for (let i = 0; i < STATUSES.length; i++) {
+    r -= STATUS_PROB[i];
+    if (r < 0) return STATUSES[i];
+  }
+  return STATUSES[STATUSES.length - 1];
+}
+
+function makeEntities(prefix, n, counter) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push(`${prefix}_${(counter + i).toString().padStart(5, '0')}`);
+  }
+  return out;
+}
+
+Object.entries(ARCH_TPL).forEach(([arch, tpl]) => {
+  for (let i = 0; i < tpl.count; i++) {
+    const id = `R${ringCounter.toString().padStart(3, '0')}`;
+    ringCounter++;
+    const n_acct = Math.max(2, Math.round(tpl.n_acct[0] + gauss(rng) * tpl.n_acct[1]));
+    const n_card = Math.max(2, Math.round(tpl.n_card[0] + gauss(rng) * tpl.n_card[1]));
+    const n_dev  = Math.max(1, Math.round(tpl.n_dev[0]  + gauss(rng) * tpl.n_dev[1]));
+    const n_ip   = Math.max(1, Math.round(tpl.n_ip[0]   + gauss(rng) * tpl.n_ip[1]));
+    const n_merch = Math.max(1, Math.round(2 + Math.abs(gauss(rng)) * 4));
+    const $exp = Math.max(500, tpl.$exp[0] + gauss(rng) * tpl.$exp[1]);
+    const captureRate = 0.35 + 0.45 * rng();
+    const $cap = $exp * captureRate;
+    const status = pickStatus();
+    // Day of first sighting biased earlier; peak around 2/3 of lifetime; last_seen near end
+    const first_day = Math.floor(rng() * (N_DAYS - 25));
+    const lifetime  = Math.max(7, Math.round(20 + Math.abs(gauss(rng)) * 25));
+    const last_day  = Math.min(N_DAYS - 1, first_day + lifetime);
+    const peak_day  = first_day + Math.floor(lifetime * (0.55 + 0.2 * rng()));
+
+    const accts = makeEntities('A', n_acct, entityCounter.acct); entityCounter.acct += n_acct;
+    const cards = makeEntities('C', n_card, entityCounter.card); entityCounter.card += n_card;
+    const devs  = makeEntities('D', n_dev,  entityCounter.dev);  entityCounter.dev  += n_dev;
+    const ips   = makeEntities('I', n_ip,   entityCounter.ip);   entityCounter.ip   += n_ip;
+    const merchs = makeEntities('M', n_merch, entityCounter.merch); entityCounter.merch += n_merch;
+
+    RINGS.push({
+      id, arch, status,
+      n_acct, n_card, n_dev, n_ip, n_merch,
+      $exp, $cap, captureRate,
+      first_day, last_day, peak_day, lifetime,
+      detection: DETECTION_METHODS[Math.floor(rng() * DETECTION_METHODS.length)],
+      analyst: ['M. Patel', 'L. Tanaka', 'S. Okafor', 'R. Volkov', 'J. Mendes'][Math.floor(rng() * 5)],
+      accts, cards, devs, ips, merchs,
+      shareDev: tpl.shareDev, shareIp: tpl.shareIp,
+    });
+  }
+});
+
+// --- Cross-ring entity overlap: have ~10% of devices and ~8% of IPs appear in 2-3 rings ---
+const overlapEdges = []; // pairs of {a:ringId, b:ringId, kind, count}
+const dev2rings = {};
+const ip2rings  = {};
+RINGS.forEach(r => {
+  r.devs.forEach(d => { (dev2rings[d] = dev2rings[d] || []).push(r.id); });
+  r.ips.forEach(ip => { (ip2rings[ip]  = ip2rings[ip]  || []).push(r.id); });
+});
+// Plant overlap: pick a sample of devices from large rings and add them to other rings
+const candidateDevs = Object.entries(dev2rings).map(([d, rs]) => ({ d, rs }));
+candidateDevs.forEach(({ d, rs }) => {
+  if (rng() < 0.10) {
+    const others = RINGS.filter(r => !rs.includes(r.id));
+    if (others.length === 0) return;
+    const target = others[Math.floor(rng() * others.length)];
+    target.devs.push(d);
+    target.shared_devs = (target.shared_devs || 0) + 1;
+    dev2rings[d].push(target.id);
+  }
+});
+const candidateIps = Object.entries(ip2rings).map(([ip, rs]) => ({ ip, rs }));
+candidateIps.forEach(({ ip, rs }) => {
+  if (rng() < 0.08) {
+    const others = RINGS.filter(r => !rs.includes(r.id));
+    if (others.length === 0) return;
+    const target = others[Math.floor(rng() * others.length)];
+    target.ips.push(ip);
+    target.shared_ips = (target.shared_ips || 0) + 1;
+    ip2rings[ip].push(target.id);
+  }
+});
+// Build overlap edges (ring-pair counts)
+const ringPairs = {};
+function addPair(a, b, kind) {
+  if (a === b) return;
+  const key = a < b ? `${a}|${b}|${kind}` : `${b}|${a}|${kind}`;
+  ringPairs[key] = (ringPairs[key] || 0) + 1;
+}
+Object.values(dev2rings).forEach(rs => {
+  if (rs.length < 2) return;
+  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) addPair(rs[i], rs[j], 'dev');
+});
+Object.values(ip2rings).forEach(rs => {
+  if (rs.length < 2) return;
+  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) addPair(rs[i], rs[j], 'ip');
+});
+Object.entries(ringPairs).forEach(([k, count]) => {
+  const [a, b, kind] = k.split('|');
+  overlapEdges.push({ a, b, kind, count });
+});
+
+// --- Daily timeline: per-ring fraud_rate and $exposure ---
+RINGS.forEach(r => {
+  r.daily_dollars = dates.map((d, di) => {
+    if (di < r.first_day || di > r.last_day) return 0;
+    const t = (di - r.first_day) / Math.max(1, r.lifetime);
+    // Triangular-ish: ramps up to peak, then decays
+    const peakT = (r.peak_day - r.first_day) / Math.max(1, r.lifetime);
+    const v = t <= peakT ? t / peakT : 1 - (t - peakT) / (1 - peakT + 0.01);
+    const noise = 0.15 * Math.abs(gauss(rng));
+    return Math.max(0, r.$exp * v / r.lifetime * (1 + noise));
+  });
+  r.daily_alerts = r.daily_dollars.map(d => Math.round(d / 200 + Math.abs(gauss(rng)) * 2));
+});
+
+// --- Compute headline KPIs ---
+const N_RINGS = RINGS.length;
+const TOTAL_EXP = RINGS.reduce((a, r) => a + r.$exp, 0);
+const TOTAL_CAP = RINGS.reduce((a, r) => a + r.$cap, 0);
+const TOTAL_ACCTS = RINGS.reduce((a, r) => a + r.n_acct, 0);
+const TOTAL_CARDS = RINGS.reduce((a, r) => a + r.n_card, 0);
+const TOTAL_DEVS  = Object.keys(dev2rings).length;
+const TOTAL_IPS   = Object.keys(ip2rings).length;
+const ACTIVE_COUNT = RINGS.filter(r => r.status === 'active').length;
+const NEW_THIS_WEEK = RINGS.filter(r => r.first_day >= N_DAYS - 7).length;
+const SHARED_DEVS = Object.values(dev2rings).filter(rs => rs.length >= 2).length;
+const SHARED_IPS  = Object.values(ip2rings).filter(rs => rs.length >= 2).length;
+const CAPTURE_RATE = TOTAL_CAP / TOTAL_EXP;
+
+/* ============================================================================
+   Helper utilities (DOM, formatting, charts)
+   ============================================================================ */
+function el(tag, cls, html) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  return e;
+}
+function pageHeader(t, d) {
+  const h = el('div', 'page-h');
+  h.innerHTML = `<h1 class="page-t">${t}</h1>${d ? `<p class="page-d">${d}</p>` : ''}`;
+  return h;
+}
+function chartCard(title, sub, height) {
+  const wrap = el('div', 'chart-wrap');
+  const head = el('div', 'chart-head');
+  head.innerHTML = `<div class="chart-t">${title}</div>${sub ? `<div class="chart-s">${sub}</div>` : ''}`;
+  const body = el('div', 'chart-body');
+  const plot = el('div');
+  plot.style.height = (height || 360) + 'px';
+  body.appendChild(plot);
+  wrap.appendChild(head); wrap.appendChild(body);
+  return { wrap, plot };
+}
+function baseLayout(extra) {
+  return Object.assign({
+    margin: { t: 28, r: 22, b: 48, l: 60 },
+    font: FONT, paper_bgcolor: 'white', plot_bgcolor: 'white',
+    legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center', font: { size: 11 } },
+  }, extra || {});
+}
+const fmt$ = v => v == null ? '—' : '$' + (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + 'K' : v.toFixed(0));
+const fmtN = v => v == null ? '—' : v.toLocaleString();
+const fmtP = (v, d) => (v * 100).toFixed(d == null ? 1 : d) + '%';
+
+function makeCallout(title, body, kind) {
+  const c = el('div', 'alert ' + (kind || 'info'));
+  c.innerHTML = `<div><strong>${title}.</strong> ${body}</div>`;
+  return c;
+}
+
+function statusPill(s) { return `<span class="pill pill-status-${s}">${s}</span>`; }
+function archPill(a) { return `<span class="pill pill-${a.replace('_','-')}">${ARCH_LABEL[a]}</span>`; }
+
+/* ============================================================================
+   Network layout (radial cluster, precomputed)
+   ============================================================================ */
+function ringLayout(ring) {
+  // Place ring entities in concentric rings around a center.
+  // Each entity type gets its own radius and angular slot.
+  const cx = 0, cy = 0;
+  const layers = [
+    { kind: 'acct',  ents: ring.accts,  r: 1.0,  color: COLORS.acct },
+    { kind: 'card',  ents: ring.cards,  r: 1.7,  color: COLORS.card },
+    { kind: 'dev',   ents: ring.devs,   r: 0.5,  color: COLORS.dev },
+    { kind: 'ip',    ents: ring.ips,    r: 0.5,  color: COLORS.ip, offset: Math.PI },
+    { kind: 'merch', ents: ring.merchs, r: 2.3,  color: COLORS.merch },
+  ];
+  const nodes = [];
+  layers.forEach(L => {
+    const n = L.ents.length;
+    L.ents.forEach((id, i) => {
+      const th = (L.offset || 0) + (i / Math.max(n, 1)) * Math.PI * 2;
+      nodes.push({
+        id, kind: L.kind, color: L.color,
+        x: cx + L.r * Math.cos(th),
+        y: cy + L.r * Math.sin(th),
+      });
+    });
+  });
+  // Edges: account ↔ each card (1-to-many), account ↔ device (sample), account ↔ ip (sample), card ↔ merchant
+  const edges = [];
+  const cardsPerAcct = Math.ceil(ring.n_card / Math.max(ring.n_acct, 1));
+  ring.accts.forEach((aid, ai) => {
+    for (let k = 0; k < cardsPerAcct; k++) {
+      const cIdx = (ai * cardsPerAcct + k) % ring.n_card;
+      edges.push({ a: aid, b: ring.cards[cIdx], kind: 'acct-card' });
+    }
+    edges.push({ a: aid, b: ring.devs[ai % ring.n_dev], kind: 'acct-dev' });
+    edges.push({ a: aid, b: ring.ips[ai % ring.n_ip],   kind: 'acct-ip' });
+  });
+  ring.cards.forEach((cid, ci) => {
+    edges.push({ a: cid, b: ring.merchs[ci % ring.n_merch], kind: 'card-merch' });
+  });
+  return { nodes, edges };
+}
+
+function macroLayout() {
+  // Position rings on a grid (sorted by archetype, then by exposure)
+  const groups = {};
+  RINGS.forEach(r => { (groups[r.arch] = groups[r.arch] || []).push(r); });
+  const out = [];
+  let archIdx = 0;
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  archOrder.forEach(a => {
+    if (!groups[a]) return;
+    groups[a].sort((x, y) => y.$exp - x.$exp);
+    const radius = 4 + archIdx * 5;
+    const n = groups[a].length;
+    groups[a].forEach((r, i) => {
+      const theta = (i / Math.max(n, 1)) * Math.PI * 2 + archIdx * 0.1;
+      out.push({
+        id: r.id, arch: a, status: r.status, $exp: r.$exp, n_acct: r.n_acct,
+        x: radius * Math.cos(theta),
+        y: radius * Math.sin(theta),
+      });
+    });
+    archIdx++;
+  });
+  return out;
+}
+const MACRO = macroLayout();
+
+/* ============================================================================
+   NAV + ROUTES
+   ============================================================================ */
+const NAV = [
+  { id: 'overview',  title: 'Overview', kind: 'direct' },
+  { id: 'catalog',   title: 'Ring catalog', kind: 'direct', badge: String(N_RINGS) },
+  { id: 'graph',     title: 'Network graph', kind: 'direct', badge: 'live', badgeKind: 'accent' },
+  { id: 'archetype', title: 'Archetype breakdown', kind: 'direct' },
+  { id: 'overlap',   title: 'Cross-ring overlap', kind: 'direct',
+    badge: String(SHARED_DEVS + SHARED_IPS), badgeKind: 'warn' },
+  { id: 'growth',    title: 'Growth & decay', kind: 'direct' },
+  { id: 'detection', title: 'Detection methods', kind: 'direct' },
+  { id: 'impact',    title: 'Impact analysis', kind: 'direct' },
+  { id: 'queue',     title: 'Investigation queue', kind: 'direct',
+    badge: String(RINGS.filter(r => r.status === 'investigating').length), badgeKind: 'accent' },
+];
+const ROUTES = {};
+
+/* -------------------- OVERVIEW -------------------- */
+ROUTES['overview'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Fraud Rings · Overview',
+    `Network-driven view of coordinated fraud activity. The dataset spans ${N_DAYS} days and surfaces ${N_RINGS} distinct rings across ${Object.keys(ARCH_TPL).length} archetypes. Each ring is a cluster of accounts, cards, devices, IPs, and merchants linked by shared infrastructure or behavioral fingerprint. Use the catalog to drill into any individual ring; use the network graph to see the macroscopic landscape.`
+  ));
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi kpi-bad"><div class="kpi-l">Active rings</div><div class="kpi-v">${ACTIVE_COUNT}</div><div class="kpi-s">of ${N_RINGS} total</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">$ exposure (cumulative)</div><div class="kpi-v">${fmt$(TOTAL_EXP)}</div><div class="kpi-s">${fmt$(TOTAL_CAP)} captured · ${fmtP(CAPTURE_RATE)} capture rate</div></div>
+    <div class="kpi kpi-accent"><div class="kpi-l">Surfaced this week</div><div class="kpi-v">${NEW_THIS_WEEK}</div><div class="kpi-s">first-seen within last 7d</div></div>
+    <div class="kpi"><div class="kpi-l">Cross-ring overlap</div><div class="kpi-v">${SHARED_DEVS + SHARED_IPS}</div><div class="kpi-s">${SHARED_DEVS} devices · ${SHARED_IPS} IPs span 2+ rings</div></div>
+  `;
+  m.appendChild(kpis);
+
+  const k2 = el('div', 'kpis');
+  k2.innerHTML = `
+    <div class="kpi"><div class="kpi-l">Accounts in rings</div><div class="kpi-v">${fmtN(TOTAL_ACCTS)}</div><div class="kpi-s">across all rings</div></div>
+    <div class="kpi"><div class="kpi-l">Cards</div><div class="kpi-v">${fmtN(TOTAL_CARDS)}</div></div>
+    <div class="kpi"><div class="kpi-l">Devices</div><div class="kpi-v">${fmtN(TOTAL_DEVS)}</div></div>
+    <div class="kpi"><div class="kpi-l">IPs</div><div class="kpi-v">${fmtN(TOTAL_IPS)}</div></div>
+  `;
+  m.appendChild(k2);
+
+  // Daily $ exposure timeline by archetype
+  const cTime = chartCard('Daily $ exposure by archetype',
+    'Stacked area shows fresh ring exposure landing each day. Card-testing rings lift on Friday/weekend nights; bust-out clusters cause the broader spikes.');
+  m.appendChild(cTime.wrap);
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const traces = archOrder.map(a => ({
+    x: dates,
+    y: dates.map((_, di) =>
+      RINGS.filter(r => r.arch === a).reduce((s, r) => s + (r.daily_dollars[di] || 0), 0)
+    ),
+    type: 'scatter', mode: 'lines', stackgroup: 'one',
+    name: ARCH_LABEL[a],
+    line: { width: 0 },
+    fillcolor: COLORS[a],
+  }));
+  Plotly.newPlot(cTime.plot, traces, baseLayout({
+    yaxis: { title: '$ exposure / day', tickformat: '$,.0s' },
+    height: 380,
+  }), CFG);
+
+  // Right side: status distribution + archetype distribution side by side
+  const r2 = el('div', 'row2');
+  const cStatus = chartCard('Rings by status', '');
+  r2.appendChild(cStatus.wrap);
+  const statusCounts = STATUSES.map(s => RINGS.filter(r => r.status === s).length);
+  Plotly.newPlot(cStatus.plot, [{
+    labels: STATUSES, values: statusCounts, type: 'pie', hole: 0.5,
+    marker: { colors: STATUSES.map(s => COLORS[s]) },
+    textinfo: 'label+value', textposition: 'outside',
+  }], baseLayout({ showlegend: false, margin: { t: 30, r: 30, b: 30, l: 30 } }), CFG);
+
+  const cArch = chartCard('Rings × $ exposure by archetype', '');
+  r2.appendChild(cArch.wrap);
+  Plotly.newPlot(cArch.plot, [
+    { x: archOrder.map(a => ARCH_LABEL[a]),
+      y: archOrder.map(a => RINGS.filter(r => r.arch === a).length),
+      type: 'bar', name: 'Count',
+      marker: { color: archOrder.map(a => COLORS[a]) },
+    },
+    { x: archOrder.map(a => ARCH_LABEL[a]),
+      y: archOrder.map(a => RINGS.filter(r => r.arch === a).reduce((s, r) => s + r.$exp, 0) / 1000),
+      type: 'bar', name: '$ exposure (K)', yaxis: 'y2',
+      marker: { color: '#94a3b8' },
+    },
+  ], baseLayout({
+    yaxis: { title: 'Rings' },
+    yaxis2: { title: '$ exposure (K)', overlaying: 'y', side: 'right', tickformat: '$,.0s' },
+    barmode: 'group',
+  }), CFG);
+  m.appendChild(r2);
+
+  // Top 10 by exposure
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Top 10 rings by exposure</div><div class="chart-s">Click a row to drill into the ring focus page.</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  const top10 = [...RINGS].sort((a, b) => b.$exp - a.$exp).slice(0, 10);
+  tbl.innerHTML = `
+    <thead><tr><th>Ring</th><th>Archetype</th><th>Status</th><th>Members</th><th>$ exposure</th><th>Captured</th><th>Lifetime</th></tr></thead>
+    <tbody>${top10.map(r => `
+      <tr data-ring="${r.id}">
+        <td><span class="ring-id">${r.id}</span></td>
+        <td>${archPill(r.arch)}</td>
+        <td>${statusPill(r.status)}</td>
+        <td>${r.n_acct} acct · ${r.n_card} cards · ${r.n_dev} dev · ${r.n_ip} ip</td>
+        <td>${fmt$(r.$exp)}</td>
+        <td>${fmtP(r.captureRate, 0)}</td>
+        <td>${r.lifetime}d</td>
+      </tr>`).join('')}</tbody>`;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+  tbl.querySelectorAll('tr[data-ring]').forEach(tr => {
+    tr.onclick = () => navigate('focus', { r: tr.dataset.ring });
+  });
+};
+
+/* -------------------- CATALOG -------------------- */
+let catalogState = { archFilter: 'all', statusFilter: 'all', sort: '$exp', dir: -1, q: '' };
+ROUTES['catalog'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Ring catalog',
+    'Sortable / filterable index of every detected ring. Click a row to drill into its focus page.'
+  ));
+
+  const ctl = el('div', 'controls');
+  ctl.innerHTML = `
+    <div class="ctl"><label>Archetype</label><div class="ctl-radio">
+      <label class="${catalogState.archFilter === 'all' ? 'active' : ''}" data-f="all">All</label>
+      ${Object.keys(ARCH_TPL).map(a => `
+        <label class="${catalogState.archFilter === a ? 'active' : ''}" data-f="${a}">${ARCH_LABEL[a]}</label>
+      `).join('')}
+    </div></div>
+    <div class="ctl"><label>Status</label><div class="ctl-radio">
+      <label class="${catalogState.statusFilter === 'all' ? 'active' : ''}" data-s="all">All</label>
+      ${STATUSES.map(s => `
+        <label class="${catalogState.statusFilter === s ? 'active' : ''}" data-s="${s}">${s}</label>
+      `).join('')}
+    </div></div>
+    <div class="ctl"><label>Search</label>
+      <input type="text" id="catSearch" placeholder="ring id, analyst, detection…" value="${catalogState.q}">
+    </div>
+  `;
+  m.appendChild(ctl);
+  ctl.querySelectorAll('label[data-f]').forEach(lbl => lbl.onclick = () => { catalogState.archFilter = lbl.dataset.f; render(); });
+  ctl.querySelectorAll('label[data-s]').forEach(lbl => lbl.onclick = () => { catalogState.statusFilter = lbl.dataset.s; render(); });
+  ctl.querySelector('#catSearch').oninput = (e) => { catalogState.q = e.target.value; renderCatTable(); };
+
+  // Filter
+  let rows = [...RINGS];
+  if (catalogState.archFilter !== 'all') rows = rows.filter(r => r.arch === catalogState.archFilter);
+  if (catalogState.statusFilter !== 'all') rows = rows.filter(r => r.status === catalogState.statusFilter);
+
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.id = 'catalog-tbl-wrap';
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">${rows.length} rings · sorted by ${catalogState.sort}</div></div>`;
+  m.appendChild(tblWrap);
+
+  function renderCatTable() {
+    let r = [...RINGS];
+    if (catalogState.archFilter !== 'all') r = r.filter(x => x.arch === catalogState.archFilter);
+    if (catalogState.statusFilter !== 'all') r = r.filter(x => x.status === catalogState.statusFilter);
+    const q = catalogState.q.trim().toLowerCase();
+    if (q) r = r.filter(x =>
+      x.id.toLowerCase().includes(q) ||
+      x.analyst.toLowerCase().includes(q) ||
+      x.detection.toLowerCase().includes(q)
+    );
+    const sortKey = catalogState.sort, dir = catalogState.dir;
+    r.sort((a, b) => (a[sortKey] - b[sortKey]) * dir);
+
+    const tbl = document.createElement('table'); tbl.className = 'rt-tbl';
+    const cols = [
+      ['id', 'Ring'], ['arch', 'Archetype'], ['status', 'Status'],
+      ['n_acct', '# acct'], ['n_card', '# cards'], ['n_dev', '# dev'], ['n_ip', '# ip'],
+      ['$exp', '$ exposure'], ['captureRate', 'Capture'],
+      ['first_day', 'First seen'], ['last_day', 'Last seen'],
+      ['detection', 'Detection'], ['analyst', 'Analyst'],
+    ];
+    tbl.innerHTML = `
+      <thead><tr>${cols.map(([k, l]) => `
+        <th data-k="${k}">${l}${catalogState.sort === k ? `<span class="arr">${dir < 0 ? '▼' : '▲'}</span>` : ''}</th>
+      `).join('')}</tr></thead>
+      <tbody>${r.slice(0, 200).map(x => `
+        <tr data-ring="${x.id}">
+          <td><span class="ring-id">${x.id}</span></td>
+          <td>${archPill(x.arch)}</td>
+          <td>${statusPill(x.status)}</td>
+          <td>${x.n_acct}</td><td>${x.n_card}</td><td>${x.n_dev}</td><td>${x.n_ip}</td>
+          <td>${fmt$(x.$exp)}</td><td>${fmtP(x.captureRate, 0)}</td>
+          <td>${dates[x.first_day]}</td><td>${dates[x.last_day]}</td>
+          <td>${x.detection.replace(/_/g,' ')}</td><td>${x.analyst}</td>
+        </tr>`).join('')}</tbody>`;
+    const old = tblWrap.querySelector('table'); if (old) old.remove();
+    tblWrap.appendChild(tbl);
+    tbl.querySelectorAll('th[data-k]').forEach(th => {
+      th.onclick = () => {
+        const k = th.dataset.k;
+        if (catalogState.sort === k) catalogState.dir *= -1;
+        else { catalogState.sort = k; catalogState.dir = -1; }
+        renderCatTable();
+      };
+    });
+    tbl.querySelectorAll('tr[data-ring]').forEach(tr => {
+      tr.onclick = () => navigate('focus', { r: tr.dataset.ring });
+    });
+    tblWrap.querySelector('.chart-t').textContent = `${r.length} rings · sorted by ${catalogState.sort}`;
+  }
+  renderCatTable();
+};
+
+/* -------------------- FOCUS (per-ring drill-down) -------------------- */
+ROUTES['focus'] = (params) => {
+  const m = main();
+  const ringId = (params && params.r) || RINGS[0].id;
+  const ring = RINGS.find(r => r.id === ringId) || RINGS[0];
+
+  // Hero
+  const hero = el('div', 'ring-hero');
+  const idx = RINGS.findIndex(r => r.id === ring.id);
+  hero.innerHTML = `
+    <h1 class="ring-hero-name">${ring.id}</h1>
+    <div class="ring-hero-meta">
+      <span>${archPill(ring.arch)}</span>
+      <span>${statusPill(ring.status)}</span>
+      <span><strong>${fmt$(ring.$exp)}</strong> exposure</span>
+      <span>${fmtP(ring.captureRate, 0)} captured</span>
+      <span>analyst <strong>${ring.analyst}</strong></span>
+      <span>${dates[ring.first_day]} → ${dates[ring.last_day]} · ${ring.lifetime}d</span>
+    </div>
+    <div class="ring-hero-nav">
+      <button id="prev" ${idx <= 0 ? 'disabled' : ''}>← prev</button>
+      <span class="ff-counter" style="font-size:11px;color:var(--dim)">${idx + 1} / ${RINGS.length}</span>
+      <button id="next" ${idx >= RINGS.length - 1 ? 'disabled' : ''}>next →</button>
+    </div>
+  `;
+  m.appendChild(hero);
+  hero.querySelector('#prev').onclick = () => idx > 0 && navigate('focus', { r: RINGS[idx - 1].id });
+  hero.querySelector('#next').onclick = () => idx < RINGS.length - 1 && navigate('focus', { r: RINGS[idx + 1].id });
+
+  // Entity grid
+  const grid = el('div', 'entity-grid');
+  grid.innerHTML = `
+    <div class="entity-tile"><div class="entity-tile-l acct">accounts</div>   <div class="entity-tile-v">${ring.n_acct}</div></div>
+    <div class="entity-tile"><div class="entity-tile-l card">cards</div>      <div class="entity-tile-v">${ring.n_card}</div></div>
+    <div class="entity-tile"><div class="entity-tile-l dev">devices</div>     <div class="entity-tile-v">${ring.n_dev}</div></div>
+    <div class="entity-tile"><div class="entity-tile-l ip">IPs</div>          <div class="entity-tile-v">${ring.n_ip}</div></div>
+    <div class="entity-tile"><div class="entity-tile-l merch">merchants</div> <div class="entity-tile-v">${ring.n_merch}</div></div>
+  `;
+  m.appendChild(grid);
+
+  // Network graph for this ring
+  const cNet = chartCard(`Ring ${ring.id} · entity network`,
+    'Inner ring = devices/IPs (shared infrastructure). Middle ring = accounts. Outer = cards. Outermost = merchants. Edges show entity relationships.');
+  m.appendChild(cNet.wrap);
+
+  const layout = ringLayout(ring);
+  // Edges as line segments
+  const edgeX = [], edgeY = [];
+  layout.edges.forEach(e => {
+    const a = layout.nodes.find(n => n.id === e.a);
+    const b = layout.nodes.find(n => n.id === e.b);
+    if (!a || !b) return;
+    edgeX.push(a.x, b.x, null);
+    edgeY.push(a.y, b.y, null);
+  });
+  const traces = [
+    { x: edgeX, y: edgeY, mode: 'lines', type: 'scatter', hoverinfo: 'skip',
+      line: { color: 'rgba(100,116,139,0.25)', width: 0.6 }, showlegend: false },
+  ];
+  ['dev', 'ip', 'acct', 'card', 'merch'].forEach(kind => {
+    const ns = layout.nodes.filter(n => n.kind === kind);
+    if (!ns.length) return;
+    traces.push({
+      x: ns.map(n => n.x), y: ns.map(n => n.y),
+      mode: 'markers', type: 'scatter',
+      name: kind, hovertext: ns.map(n => `${n.kind} ${n.id}`),
+      hovertemplate: '%{hovertext}<extra></extra>',
+      marker: {
+        size: kind === 'dev' || kind === 'ip' ? 14 : kind === 'acct' ? 10 : 7,
+        color: COLORS[kind], line: { color: 'white', width: 1 },
+      },
+    });
+  });
+  Plotly.newPlot(cNet.plot, traces, baseLayout({
+    xaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-3, 3] },
+    yaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-3, 3], scaleanchor: 'x' },
+    height: 480, margin: { t: 20, r: 20, b: 20, l: 20 },
+  }), CFG);
+
+  // Daily $ timeline for this ring
+  const cTl = chartCard(`Daily $ exposure timeline`,
+    `Ring lifetime: ${dates[ring.first_day]} → ${dates[ring.last_day]} · peak around ${dates[ring.peak_day]}.`);
+  m.appendChild(cTl.wrap);
+  Plotly.newPlot(cTl.plot, [
+    { x: dates, y: ring.daily_dollars, type: 'scatter', mode: 'lines', fill: 'tozeroy',
+      line: { color: COLORS[ring.arch], width: 2 }, fillcolor: COLORS[ring.arch] + '33',
+      name: '$ exposure', hovertemplate: '%{x}<br>%{y:$,.0f}<extra></extra>' },
+    { x: dates, y: ring.daily_alerts, type: 'scatter', mode: 'lines', yaxis: 'y2',
+      line: { color: COLORS.accent, width: 1.4, dash: 'dot' }, name: 'alerts' },
+  ], baseLayout({
+    yaxis: { title: '$ exposure', tickformat: '$,.0s' },
+    yaxis2: { title: 'alerts', overlaying: 'y', side: 'right' },
+    height: 300,
+    shapes: [
+      { type: 'line', xref: 'x', yref: 'paper', x0: dates[ring.peak_day], x1: dates[ring.peak_day],
+        y0: 0, y1: 1, line: { color: '#ef4444', width: 1, dash: 'dash' } },
+    ],
+    annotations: [
+      { x: dates[ring.peak_day], y: 1.02, xref: 'x', yref: 'paper', text: 'peak',
+        showarrow: false, font: { color: '#ef4444', size: 10 }, xanchor: 'center' },
+    ],
+  }), CFG);
+
+  // Detection method + ring-level callout
+  const ringNote = ring.arch === 'card_test'
+    ? 'Card-testing rings are characterized by very many cards on very few devices and IPs — a small set of attackers cycling through stolen card numbers. Watch for shared device fingerprints.'
+    : ring.arch === 'mule'
+    ? 'Mule networks distribute activity across many accounts to evade per-account velocity limits. Look for synchronized timing and merchant overlap rather than per-entity outliers.'
+    : ring.arch === 'syn_id'
+    ? 'Synthetic-identity rings show consistent device entropy across "different" accounts. Address-match score and behavioral biometrics are the discriminators that survive identity-document scrutiny.'
+    : ring.arch === 'bust_out'
+    ? 'Bust-out rings have a long quiet ramp followed by a high-amount burst. The signal is the lifecycle shape, not a per-tx feature.'
+    : 'Account takeover clusters share devices/IPs across legitimate accounts that have been compromised. The accounts themselves look fine; the infrastructure links them.';
+  m.appendChild(makeCallout(`Pattern · ${ARCH_LABEL[ring.arch]}`, `${ringNote} · Detection method: <code>${ring.detection}</code>`, 'info'));
+};
+
+/* -------------------- NETWORK GRAPH (macro view) -------------------- */
+ROUTES['graph'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Network graph · macro view',
+    `One node per ring, sized by exposure, colored by archetype, positioned by archetype cluster. Edges connect rings that share at least one device or IP — a structural signal of coordinated infrastructure across nominally separate rings.`
+  ));
+
+  const c = chartCard('All rings · archetype clusters with cross-ring infrastructure links',
+    'Hover for ring metadata. Edges marked in orange are device-overlap; pink are IP-overlap. Click a node to drill into that ring.');
+  m.appendChild(c.wrap);
+
+  // Edges
+  const edgeX = [], edgeY = [], edgeColors = [];
+  overlapEdges.forEach(e => {
+    const a = MACRO.find(n => n.id === e.a);
+    const b = MACRO.find(n => n.id === e.b);
+    if (!a || !b) return;
+    edgeX.push(a.x, b.x, null);
+    edgeY.push(a.y, b.y, null);
+  });
+
+  // Group nodes by archetype for separate traces (legend)
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const nodeTraces = archOrder.map(a => {
+    const ns = MACRO.filter(n => n.arch === a);
+    const sizes = ns.map(n => 6 + Math.min(40, Math.sqrt(n.$exp) / 25));
+    return {
+      x: ns.map(n => n.x), y: ns.map(n => n.y),
+      mode: 'markers', type: 'scatter', name: ARCH_LABEL[a],
+      marker: {
+        size: sizes, color: COLORS[a], line: { color: 'white', width: 1 },
+        sizemode: 'diameter', opacity: 0.92,
+      },
+      text: ns.map(n => n.id),
+      customdata: ns.map(n => [
+        ARCH_LABEL[a], n.status, n.n_acct, fmt$(n.$exp),
+      ]),
+      hovertemplate: '<b>%{text}</b><br>%{customdata[0]}<br>status: %{customdata[1]}<br>%{customdata[2]} accts<br>exposure: %{customdata[3]}<extra></extra>',
+    };
+  });
+  const traces = [
+    { x: edgeX, y: edgeY, mode: 'lines', type: 'scatter', hoverinfo: 'skip',
+      line: { color: 'rgba(245,158,11,0.4)', width: 0.8 }, showlegend: false },
+    ...nodeTraces,
+  ];
+
+  Plotly.newPlot(c.plot, traces, baseLayout({
+    xaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-30, 30] },
+    yaxis: { showgrid: false, zeroline: false, showticklabels: false, range: [-30, 30], scaleanchor: 'x' },
+    height: 600, margin: { t: 30, r: 20, b: 60, l: 20 },
+  }), CFG);
+
+  // Wire click -> drill
+  c.plot.on('plotly_click', e => {
+    if (!e.points || !e.points.length) return;
+    const id = e.points[0].text;
+    if (id) navigate('focus', { r: id });
+  });
+
+  m.appendChild(makeCallout('Reading the graph',
+    `Cluster proximity reflects shared archetype. Cross-cluster edges are the interesting signal: when an account-takeover ring shares a device with a card-testing ring, that's evidence of operational reuse — the same infrastructure being rented out across attack types.`,
+    'info'));
+};
+
+/* -------------------- ARCHETYPES -------------------- */
+ROUTES['archetype'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Archetype breakdown',
+    `Each archetype has a different operational signature. The detection feature that surfaces a card-testing ring (high card-per-device ratio) is useless for a mule network (where the ratio is roughly 1). Knowing what kind of ring you're looking at determines what you should look for.`
+  ));
+
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  // KPI tiles per archetype
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = archOrder.map(a => {
+    const rs = RINGS.filter(r => r.arch === a);
+    const exp = rs.reduce((s, r) => s + r.$exp, 0);
+    const accts = rs.reduce((s, r) => s + r.n_acct, 0);
+    return `<div class="kpi" style="border-left:3px solid ${COLORS[a]}">
+      <div class="kpi-l">${ARCH_LABEL[a]}</div>
+      <div class="kpi-v">${rs.length}</div>
+      <div class="kpi-s">${fmt$(exp)} · ${accts} accts</div>
+    </div>`;
+  }).join('');
+  m.appendChild(kpis);
+
+  // Chart: ratio of cards per account, by archetype (boxplot)
+  const c1 = chartCard('Cards per account, by archetype',
+    'Card-testing rings cycle dozens of cards per account; bust-out and synthetic-ID rings stay near 1. Ratio alone classifies many rings.');
+  m.appendChild(c1.wrap);
+  const traces1 = archOrder.map(a => ({
+    y: RINGS.filter(r => r.arch === a).map(r => r.n_card / Math.max(r.n_acct, 1)),
+    type: 'box', name: ARCH_LABEL[a],
+    marker: { color: COLORS[a] },
+    boxmean: true,
+  }));
+  Plotly.newPlot(c1.plot, traces1, baseLayout({
+    yaxis: { title: 'cards / account', type: 'log' },
+    showlegend: false,
+    height: 360,
+  }), CFG);
+
+  // Two boxplots side-by-side: devices/account and lifetime
+  const r2 = el('div', 'row2');
+  const c2 = chartCard('Devices per account', 'ATO clusters concentrate many accounts on few devices; mule networks scatter.');
+  r2.appendChild(c2.wrap);
+  const traces2 = archOrder.map(a => ({
+    y: RINGS.filter(r => r.arch === a).map(r => r.n_acct / Math.max(r.n_dev, 1)),
+    type: 'box', name: ARCH_LABEL[a],
+    marker: { color: COLORS[a] }, boxmean: true,
+  }));
+  Plotly.newPlot(c2.plot, traces2, baseLayout({
+    yaxis: { title: 'accounts / device', type: 'log' },
+    showlegend: false, height: 320,
+  }), CFG);
+
+  const c3 = chartCard('Ring lifetime distribution', 'Card-testing rings are short-lived; bust-out rings have the longest pre-burst quiet period.');
+  r2.appendChild(c3.wrap);
+  const traces3 = archOrder.map(a => ({
+    y: RINGS.filter(r => r.arch === a).map(r => r.lifetime),
+    type: 'box', name: ARCH_LABEL[a],
+    marker: { color: COLORS[a] }, boxmean: true,
+  }));
+  Plotly.newPlot(c3.plot, traces3, baseLayout({
+    yaxis: { title: 'days' },
+    showlegend: false, height: 320,
+  }), CFG);
+  m.appendChild(r2);
+
+  // Description table
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Archetype reference</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  const refs = {
+    syn_id:   { signature: 'Many "different" accounts share device entropy and behavioral biometrics; address-match scores low.', signal: 'Behavioral biometrics, device fingerprint clustering, address verification.', payoff: 'Mid-term ($85K avg), prevention before bust-out.' },
+    mule:     { signature: 'Many accounts, varied merchants, low per-tx amount, synchronized timing.', signal: 'Merchant graph + time-window clustering. Per-account features look fine.', payoff: 'High-volume ($220K avg), AML/regulatory risk.' },
+    card_test: { signature: 'Few devices/IPs, very many cards, small amounts at a small set of test merchants.', signal: 'Card-per-device ratio; rapid 3DS-fail patterns.', payoff: 'Lower direct exposure ($12K avg) but loses are downstream — tested cards used elsewhere.' },
+    bust_out:  { signature: 'Long quiet history then sudden high-amount burst across newly issued credit limits.', signal: 'Lifecycle shape — utilization curve, not per-tx features.', payoff: 'Highest avg exposure ($340K), often discovered post-loss.' },
+    ato:       { signature: 'Compromised legitimate accounts share device fingerprints / IP ranges; behaviors deviate from baseline.', signal: 'Device-account graph + behavioral baseline deviation.', payoff: 'High customer impact, reputational risk.' },
+  };
+  tbl.innerHTML = `
+    <thead><tr><th>Archetype</th><th>Operational signature</th><th>Detection signal</th><th>Why it matters</th></tr></thead>
+    <tbody>${archOrder.map(a => `
+      <tr><td>${archPill(a)}</td><td>${refs[a].signature}</td><td>${refs[a].signal}</td><td>${refs[a].payoff}</td></tr>
+    `).join('')}</tbody>
+  `;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+};
+
+/* -------------------- CROSS-RING OVERLAP -------------------- */
+ROUTES['overlap'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Cross-ring overlap',
+    `Devices and IPs that appear in 2+ rings are evidence of shared infrastructure — operationally distinct attacks running through common rented or compromised assets. The most interesting overlaps are cross-archetype: card-testing rings sharing devices with ATO clusters, for example.`
+  ));
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi kpi-warn"><div class="kpi-l">Overlapping devices</div><div class="kpi-v">${SHARED_DEVS}</div><div class="kpi-s">${fmtP(SHARED_DEVS / TOTAL_DEVS)} of total</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">Overlapping IPs</div><div class="kpi-v">${SHARED_IPS}</div><div class="kpi-s">${fmtP(SHARED_IPS / TOTAL_IPS)} of total</div></div>
+    <div class="kpi kpi-bad"><div class="kpi-l">Ring pairs with overlap</div><div class="kpi-v">${overlapEdges.length}</div><div class="kpi-s">unique ring pairs</div></div>
+    <div class="kpi"><div class="kpi-l">Cross-archetype pairs</div><div class="kpi-v">${overlapEdges.filter(e => RINGS.find(r => r.id === e.a).arch !== RINGS.find(r => r.id === e.b).arch).length}</div><div class="kpi-s">most diagnostic</div></div>
+  `;
+  m.appendChild(kpis);
+
+  // Heatmap: archetype x archetype overlap counts
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const matrix = archOrder.map(() => archOrder.map(() => 0));
+  overlapEdges.forEach(e => {
+    const ra = RINGS.find(r => r.id === e.a);
+    const rb = RINGS.find(r => r.id === e.b);
+    const i = archOrder.indexOf(ra.arch), j = archOrder.indexOf(rb.arch);
+    matrix[i][j] += e.count; if (i !== j) matrix[j][i] += e.count;
+  });
+  const cHeat = chartCard('Archetype × archetype overlap intensity',
+    'Off-diagonal cells are cross-archetype reuse — the highest-priority pattern. Diagonals are intra-archetype overlap (commonly devices reused within an attacker\'s own family of rings).');
+  m.appendChild(cHeat.wrap);
+  Plotly.newPlot(cHeat.plot, [{
+    z: matrix, x: archOrder.map(a => ARCH_LABEL[a]), y: archOrder.map(a => ARCH_LABEL[a]),
+    type: 'heatmap', colorscale: 'Reds',
+    hovertemplate: '%{y} ↔ %{x}<br>%{z} shared infrastructure ties<extra></extra>',
+  }], baseLayout({ height: 380, margin: { t: 30, r: 30, b: 60, l: 100 } }), CFG);
+
+  // Top overlap pairs table
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Top ring pairs by infrastructure overlap</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  const top = [...overlapEdges].sort((x, y) => y.count - x.count).slice(0, 30);
+  tbl.innerHTML = `
+    <thead><tr><th>Ring A</th><th>Archetype</th><th>Ring B</th><th>Archetype</th><th>Shared kind</th><th>Count</th><th>Cross-archetype?</th></tr></thead>
+    <tbody>${top.map(e => {
+      const ra = RINGS.find(r => r.id === e.a);
+      const rb = RINGS.find(r => r.id === e.b);
+      const cross = ra.arch !== rb.arch;
+      return `<tr ${cross ? 'class="hl"' : ''}>
+        <td><span class="ring-id">${ra.id}</span></td><td>${archPill(ra.arch)}</td>
+        <td><span class="ring-id">${rb.id}</span></td><td>${archPill(rb.arch)}</td>
+        <td>${e.kind === 'dev' ? 'device' : 'IP'}</td>
+        <td>${e.count}</td>
+        <td>${cross ? '<span class="pill pill-bad">cross</span>' : '<span class="pill pill-warn">same</span>'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  `;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+};
+
+/* -------------------- GROWTH & DECAY -------------------- */
+ROUTES['growth'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Growth & decay',
+    `Ring lifecycle: when they emerge, peak, and die. Rings rarely look the same across their lifetime — the early signal is often weak; by the time exposure is large, the damage is mostly done. The lag between first-seen and detection-action is one of the most actionable monitoring metrics.`
+  ));
+
+  // Per-day count of rings active
+  const active_per_day = dates.map((d, i) => RINGS.filter(r => r.first_day <= i && r.last_day >= i).length);
+  const new_per_day = dates.map((d, i) => RINGS.filter(r => r.first_day === i).length);
+  const dead_per_day = dates.map((d, i) => RINGS.filter(r => r.last_day === i).length);
+  const c1 = chartCard('Active rings per day (with new births and deaths)',
+    'Active count is the running total. New births spike when a new attack family lands. Deaths concentrate after enforcement actions.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { x: dates, y: active_per_day, type: 'scatter', mode: 'lines', name: 'Active rings',
+      line: { color: COLORS.accent, width: 2.5 }, fill: 'tozeroy', fillcolor: 'rgba(99,102,241,0.10)' },
+    { x: dates, y: new_per_day, type: 'bar', name: 'Births', yaxis: 'y2',
+      marker: { color: COLORS.bad } },
+    { x: dates, y: dead_per_day.map(v => -v), type: 'bar', name: 'Deaths', yaxis: 'y2',
+      marker: { color: COLORS.good } },
+  ], baseLayout({
+    yaxis: { title: 'Active rings' },
+    yaxis2: { title: 'Births / Deaths', overlaying: 'y', side: 'right' },
+    barmode: 'overlay', height: 380,
+  }), CFG);
+
+  // Cumulative exposure curve
+  const c2 = chartCard('Cumulative $ exposure per archetype',
+    'Steeper-curve archetypes are the ones expanding fastest. Plateaus mean enforcement landed.');
+  m.appendChild(c2.wrap);
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const traces = archOrder.map(a => {
+    let cum = 0;
+    return {
+      x: dates,
+      y: dates.map((_, di) => {
+        cum += RINGS.filter(r => r.arch === a)
+                    .reduce((s, r) => s + (r.daily_dollars[di] || 0), 0);
+        return cum;
+      }),
+      type: 'scatter', mode: 'lines', name: ARCH_LABEL[a],
+      line: { color: COLORS[a], width: 2 },
+    };
+  });
+  Plotly.newPlot(c2.plot, traces, baseLayout({
+    yaxis: { title: 'cumulative $ exposure', tickformat: '$,.0s' },
+    height: 380,
+  }), CFG);
+
+  // Ring lifetime histogram by status
+  const c3 = chartCard('Ring lifetime distribution by current status',
+    'Rings still active have shorter elapsed lifetime (we just haven\'t seen them die yet). Blocked rings cluster around the enforcement-response time.');
+  m.appendChild(c3.wrap);
+  const statusOrder = ['active', 'monitoring', 'investigating', 'blocked'];
+  Plotly.newPlot(c3.plot, statusOrder.map(s => ({
+    x: RINGS.filter(r => r.status === s).map(r => r.lifetime),
+    type: 'histogram', name: s, opacity: 0.7,
+    marker: { color: COLORS[s] }, xbins: { size: 5 },
+  })), baseLayout({
+    barmode: 'overlay',
+    xaxis: { title: 'lifetime (days)' },
+    yaxis: { title: 'ring count' },
+    height: 320,
+  }), CFG);
+};
+
+/* -------------------- DETECTION -------------------- */
+ROUTES['detection'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Detection methods',
+    `How each ring was first surfaced. Detection method is a leading indicator of where to invest detection R&D — methods that surface a lot of rings, late, are candidates for upstream improvement; methods that surface few rings, early, are candidates for amplification.`
+  ));
+
+  // Method × archetype heatmap
+  const methods = DETECTION_METHODS;
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  const matrix = methods.map(meth =>
+    archOrder.map(arch => RINGS.filter(r => r.detection === meth && r.arch === arch).length)
+  );
+  const c1 = chartCard('Detection method × archetype', 'Where each method finds rings.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [{
+    z: matrix,
+    x: archOrder.map(a => ARCH_LABEL[a]),
+    y: methods.map(m_ => m_.replace(/_/g, ' ')),
+    type: 'heatmap', colorscale: 'Blues',
+  }], baseLayout({
+    height: 420, margin: { t: 30, r: 30, b: 60, l: 180 },
+    xaxis: { tickangle: -25 },
+  }), CFG);
+
+  // Method counts
+  const r2 = el('div', 'row2');
+  const cA = chartCard('Rings per detection method', '');
+  r2.appendChild(cA.wrap);
+  const counts = methods.map(meth => RINGS.filter(r => r.detection === meth).length);
+  Plotly.newPlot(cA.plot, [{
+    x: counts, y: methods.map(m_ => m_.replace(/_/g, ' ')),
+    type: 'bar', orientation: 'h',
+    marker: { color: COLORS.accent },
+  }], baseLayout({
+    margin: { t: 20, r: 20, b: 40, l: 180 },
+    yaxis: { autorange: 'reversed' }, height: 380, showlegend: false,
+  }), CFG);
+
+  const cB = chartCard('Mean exposure when detected', '$ exposure on the day of first detection. Methods that detect early should be lower; later detection means more damage already done.');
+  r2.appendChild(cB.wrap);
+  const meanExp = methods.map(meth => {
+    const rs = RINGS.filter(r => r.detection === meth);
+    if (!rs.length) return 0;
+    return rs.reduce((s, r) => s + r.daily_dollars[r.first_day], 0) / rs.length;
+  });
+  Plotly.newPlot(cB.plot, [{
+    x: meanExp, y: methods.map(m_ => m_.replace(/_/g, ' ')),
+    type: 'bar', orientation: 'h',
+    marker: { color: meanExp.map(v => v > 5000 ? COLORS.bad : v > 2000 ? COLORS.warn : COLORS.good) },
+  }], baseLayout({
+    margin: { t: 20, r: 20, b: 40, l: 180 },
+    yaxis: { autorange: 'reversed' }, height: 380, showlegend: false,
+    xaxis: { tickformat: '$,.0s' },
+  }), CFG);
+  m.appendChild(r2);
+};
+
+/* -------------------- IMPACT -------------------- */
+ROUTES['impact'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Impact analysis',
+    `Pareto and capture-rate breakdown. The top 20% of rings tend to drive 70%+ of dollar exposure — picking them off has outsize impact, but they are also the most defended (mature attackers, longer lifecycles, more cross-ring infrastructure).`
+  ));
+
+  // Pareto: rings sorted by exposure, with cumulative %
+  const sorted = [...RINGS].sort((a, b) => b.$exp - a.$exp);
+  const cum = []; let s = 0;
+  sorted.forEach((r, i) => { s += r.$exp; cum.push({ k: i + 1, share: s / TOTAL_EXP, $: r.$exp }); });
+  const c1 = chartCard('Pareto: rings by $ exposure',
+    'Bars are individual ring exposure; line is cumulative share of total. Find the inflection point to size your top-N enforcement strategy.');
+  m.appendChild(c1.wrap);
+  Plotly.newPlot(c1.plot, [
+    { x: cum.map(c => c.k), y: cum.map(c => c.$), type: 'bar', name: '$ exposure',
+      marker: { color: COLORS.accent } },
+    { x: cum.map(c => c.k), y: cum.map(c => c.share), yaxis: 'y2',
+      type: 'scatter', mode: 'lines', name: 'cum share',
+      line: { color: COLORS.bad, width: 2.5 } },
+  ], baseLayout({
+    yaxis: { title: '$ exposure', tickformat: '$,.0s' },
+    yaxis2: { title: 'cum share', overlaying: 'y', side: 'right', tickformat: '.0%', range: [0, 1.05] },
+    height: 380,
+  }), CFG);
+
+  // Capture rate by status
+  const r2 = el('div', 'row2');
+  const cA = chartCard('Capture rate by status', '');
+  r2.appendChild(cA.wrap);
+  const statuses = STATUSES;
+  Plotly.newPlot(cA.plot, [{
+    x: statuses.map(s => s),
+    y: statuses.map(s => {
+      const rs = RINGS.filter(r => r.status === s);
+      const exp = rs.reduce((a, r) => a + r.$exp, 0);
+      const cap = rs.reduce((a, r) => a + r.$cap, 0);
+      return exp ? cap / exp : 0;
+    }),
+    type: 'bar', marker: { color: statuses.map(s => COLORS[s]) },
+    text: statuses.map(s => {
+      const rs = RINGS.filter(r => r.status === s);
+      const exp = rs.reduce((a, r) => a + r.$exp, 0);
+      const cap = rs.reduce((a, r) => a + r.$cap, 0);
+      return fmtP(exp ? cap / exp : 0, 0);
+    }),
+    textposition: 'outside',
+  }], baseLayout({
+    yaxis: { tickformat: '.0%', range: [0, 1] }, showlegend: false,
+    height: 320,
+  }), CFG);
+
+  const cB = chartCard('Exposure vs capture by archetype', '');
+  r2.appendChild(cB.wrap);
+  const archOrder = ['syn_id', 'mule', 'card_test', 'bust_out', 'ato'];
+  Plotly.newPlot(cB.plot, [
+    { x: archOrder.map(a => ARCH_LABEL[a]),
+      y: archOrder.map(a => RINGS.filter(r => r.arch === a).reduce((s, r) => s + r.$exp, 0)),
+      type: 'bar', name: 'Exposure',
+      marker: { color: archOrder.map(a => COLORS[a] + 'CC') } },
+    { x: archOrder.map(a => ARCH_LABEL[a]),
+      y: archOrder.map(a => RINGS.filter(r => r.arch === a).reduce((s, r) => s + r.$cap, 0)),
+      type: 'bar', name: 'Captured',
+      marker: { color: archOrder.map(a => COLORS[a]) } },
+  ], baseLayout({
+    yaxis: { title: '$', tickformat: '$,.0s' },
+    barmode: 'overlay', height: 320,
+  }), CFG);
+  m.appendChild(r2);
+
+  m.appendChild(makeCallout('Reading the Pareto',
+    `${(cum.findIndex(c => c.share >= 0.7) + 1)} rings (${fmtP((cum.findIndex(c => c.share >= 0.7) + 1) / N_RINGS, 0)} of total) account for 70% of cumulative exposure. Whatever your enforcement budget, the question is whether it's allocated proportional to dollar impact or proportional to ring count — those are very different policies.`,
+    'info'));
+};
+
+/* -------------------- INVESTIGATION QUEUE -------------------- */
+ROUTES['queue'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Investigation queue',
+    `Rings actively under analyst review, sorted by triage priority (combined exposure × growth velocity × overlap with other rings).`
+  ));
+
+  // Investigating rings + monitoring rings, scored
+  const open = RINGS.filter(r => r.status === 'investigating' || r.status === 'monitoring');
+  open.forEach(r => {
+    // Growth velocity: $ increase over last 7 days vs prior 7
+    const last7 = r.daily_dollars.slice(-7).reduce((a, b) => a + b, 0);
+    const prev7 = r.daily_dollars.slice(-14, -7).reduce((a, b) => a + b, 0);
+    r.velocity = (last7 - prev7) / Math.max(prev7, 100);
+    r.overlap_count = overlapEdges.filter(e => e.a === r.id || e.b === r.id).reduce((s, e) => s + e.count, 0);
+    r.triage = (r.$exp / 1000) * (1 + Math.max(0, r.velocity)) * (1 + r.overlap_count * 0.1);
+  });
+  open.sort((a, b) => b.triage - a.triage);
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi kpi-bad"><div class="kpi-l">Open cases</div><div class="kpi-v">${open.length}</div><div class="kpi-s">investigating + monitoring</div></div>
+    <div class="kpi kpi-warn"><div class="kpi-l">Open exposure</div><div class="kpi-v">${fmt$(open.reduce((s, r) => s + r.$exp, 0))}</div><div class="kpi-s">across open cases</div></div>
+    <div class="kpi"><div class="kpi-l">High-velocity (lift &gt;30%)</div><div class="kpi-v">${open.filter(r => r.velocity > 0.3).length}</div><div class="kpi-s">growing fast week-over-week</div></div>
+    <div class="kpi"><div class="kpi-l">High-overlap</div><div class="kpi-v">${open.filter(r => r.overlap_count >= 3).length}</div><div class="kpi-s">share infra with 3+ rings</div></div>
+  `;
+  m.appendChild(kpis);
+
+  const tblWrap = el('div', 'chart-wrap');
+  tblWrap.innerHTML = `<div class="chart-head"><div class="chart-t">Triage queue</div><div class="chart-s">Click a row for full ring focus.</div></div>`;
+  const tbl = el('table', 'rt-tbl');
+  tbl.innerHTML = `
+    <thead><tr><th>Priority</th><th>Ring</th><th>Archetype</th><th>Status</th><th>Analyst</th><th>$ exposure</th><th>WoW growth</th><th>Overlap ties</th><th>Lifetime</th></tr></thead>
+    <tbody>${open.slice(0, 25).map((r, i) => `
+      <tr data-ring="${r.id}">
+        <td><strong>${i + 1}</strong></td>
+        <td><span class="ring-id">${r.id}</span></td>
+        <td>${archPill(r.arch)}</td>
+        <td>${statusPill(r.status)}</td>
+        <td>${r.analyst}</td>
+        <td>${fmt$(r.$exp)}</td>
+        <td style="color:${r.velocity > 0.3 ? 'var(--bad)' : r.velocity > 0 ? 'var(--warn)' : 'var(--dim)'}">${r.velocity > 0 ? '+' : ''}${(r.velocity * 100).toFixed(0)}%</td>
+        <td>${r.overlap_count}</td>
+        <td>${r.lifetime}d</td>
+      </tr>`).join('')}</tbody>
+  `;
+  tblWrap.appendChild(tbl);
+  m.appendChild(tblWrap);
+  tbl.querySelectorAll('tr[data-ring]').forEach(tr => {
+    tr.onclick = () => navigate('focus', { r: tr.dataset.ring });
+  });
+};
+
+/* ============================================================================
+   Router + boot
+   ============================================================================ */
+function main() { return document.getElementById('main'); }
+function navEl() { return document.getElementById('nav'); }
+function crumbsEl() { return document.getElementById('crumbs'); }
+function topEl() { return document.getElementById('topstats'); }
+
+let currentPath = 'overview';
+let currentParams = {};
+
+function navigate(path, params) {
+  // purge plotly elements
+  main().querySelectorAll('div').forEach(d => { try { Plotly.purge(d); } catch (e) {} });
+  currentPath = path;
+  currentParams = params || {};
+  const qs = new URLSearchParams(currentParams).toString();
+  location.hash = '#/' + path + (qs ? '?' + qs : '');
+  renderCrumbs();
+  updateActive();
+  render();
+}
+
+function render() {
+  main().innerHTML = '';
+  const fn = ROUTES[currentPath] || ROUTES['overview'];
+  fn(currentParams);
+}
+
+function renderNav() {
+  navEl().innerHTML = '';
+  NAV.forEach(sec => {
+    const e = el('div', 'nav-direct');
+    e.dataset.path = sec.id;
+    e.innerHTML = `<span>${sec.title}</span>${sec.badge ? `<span class="badge ${sec.badgeKind ? 'badge-' + sec.badgeKind : ''}">${sec.badge}</span>` : ''}`;
+    e.onclick = () => navigate(sec.id);
+    navEl().appendChild(e);
+  });
+  updateActive();
+}
+function updateActive() {
+  document.querySelectorAll('.nav-direct').forEach(e => {
+    e.classList.toggle('active', e.dataset.path === currentPath);
+  });
+}
+function renderCrumbs() {
+  let crumbs = ['<strong>Fraud Rings</strong>'];
+  if (currentPath !== 'overview') {
+    const sec = NAV.find(s => s.id === currentPath);
+    crumbs.push('<span class="sep">›</span>');
+    crumbs.push(`<strong>${sec?.title || currentPath}</strong>`);
+    if (currentPath === 'focus' && currentParams.r) {
+      crumbs.push('<span class="sep">›</span>');
+      crumbs.push(`<span class="ring-id">${currentParams.r}</span>`);
+    }
+  }
+  crumbsEl().innerHTML = crumbs.join(' ');
+}
+function renderTop() {
+  topEl().innerHTML = `
+    <div class="tstat"><span>Rings</span><strong>${N_RINGS}</strong></div>
+    <span class="tstat-sep">·</span>
+    <div class="tstat"><span>Active</span><strong>${ACTIVE_COUNT}</strong></div>
+    <span class="tstat-sep">·</span>
+    <div class="tstat"><span>$ exposure</span><strong>${fmt$(TOTAL_EXP)}</strong></div>
+    <span class="tstat-sep">·</span>
+    <div class="tstat"><span>Capture</span><strong>${fmtP(CAPTURE_RATE, 0)}</strong></div>
+  `;
+}
+
+window.addEventListener('hashchange', () => {
+  const h = location.hash.replace(/^#\/?/, '') || 'overview';
+  const [p, qs] = h.split('?');
+  const params = Object.fromEntries(new URLSearchParams(qs || ''));
+  if (p !== currentPath || JSON.stringify(params) !== JSON.stringify(currentParams)) {
+    currentPath = p; currentParams = params;
+    renderCrumbs(); updateActive(); render();
+  }
+});
+renderNav();
+renderTop();
+const initial = location.hash.replace(/^#\/?/, '') || 'overview';
+const [p, qs] = initial.split('?');
+currentPath = p;
+currentParams = Object.fromEntries(new URLSearchParams(qs || ''));
+renderCrumbs();
+updateActive();
+render();
+</script>
+</body>
+</html>
