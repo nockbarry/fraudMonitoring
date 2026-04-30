@@ -259,6 +259,29 @@ const FEATURE_POOL = [
 // Per-archetype feature signature: which features should light up the most.
 // `weight` controls overall signal strength (= how predictable rings of this
 // archetype are by these features alone).
+// Per-archetype transaction-status fingerprint. Each is the expected fraction
+// of {sent, error, denied} status outcomes for transactions belonging to that
+// archetype. Status semantics: sent = completed, error = system/issuer failure,
+// denied = blocked by policy/model. Card-testing rings have very high error
+// and denied rates by definition; bust-out rings look almost identical to
+// legitimate traffic until the bust day. The portfolio baseline (legitimate
+// traffic) is roughly {sent: 0.93, error: 0.03, denied: 0.04}.
+const ARCH_STATUS_MIX = {
+  syn_id:        { sent: 0.74, error: 0.06, denied: 0.20 },
+  mule:          { sent: 0.85, error: 0.04, denied: 0.11 },
+  card_test:     { sent: 0.16, error: 0.55, denied: 0.29 },
+  bust_out:      { sent: 0.93, error: 0.02, denied: 0.05 },
+  ato:           { sent: 0.62, error: 0.10, denied: 0.28 },
+  triangulation: { sent: 0.81, error: 0.05, denied: 0.14 },
+  refund:        { sent: 0.91, error: 0.03, denied: 0.06 },
+  first_party:   { sent: 0.95, error: 0.02, denied: 0.03 },
+  friendly:      { sent: 0.94, error: 0.02, denied: 0.04 },
+  promo_abuse:   { sent: 0.71, error: 0.07, denied: 0.22 },
+};
+const STATUS_KEYS = ['sent', 'error', 'denied'];
+const STATUS_COLORS = { sent: '#10b981', error: '#94a3b8', denied: '#ef4444' };
+const STATUS_LABEL  = { sent: 'Sent', error: 'Error', denied: 'Denied' };
+
 const ARCH_FEATURE_PROFILE = {
   syn_id:        { top: ['address_match_score','account_age_under_30d','embed_device_net_d2','device_num_accounts','cnp_x_new_account','ip_anon_share'], weight: 0.68 },
   mule:          { top: ['velocity_amt_card_7d','embed_merchant_d1','merchant_risk_30d','is_recurring_merchant','amt_band_high','velocity_cnt_card_24h'], weight: 0.72 },
@@ -470,6 +493,29 @@ RINGS.forEach(r => {
   });
   r.daily_alerts = r.daily_tx_count.map((tx, di) => Math.round(tx * (0.02 + r.model_recall_2pct * 0.10) + Math.abs(gauss(rng))));
 
+  // Per-ring transaction-status mix: archetype baseline + idiosyncratic noise.
+  const baseMix = ARCH_STATUS_MIX[r.arch];
+  // Each ring shifts a bit from the archetype center; ensure non-negative + renormalize.
+  const sentN  = Math.max(0.02, baseMix.sent  + gauss(rng) * 0.05);
+  const errN   = Math.max(0.005, baseMix.error + gauss(rng) * 0.04);
+  const denN   = Math.max(0.005, baseMix.denied + gauss(rng) * 0.04);
+  const totMix = sentN + errN + denN;
+  r.status_mix = { sent: sentN / totMix, error: errN / totMix, denied: denN / totMix };
+  r.total_sent   = 0; r.total_error = 0; r.total_denied = 0;
+  r.daily_status_counts = r.daily_tx_count.map(tx => {
+    if (!tx) return { sent: 0, error: 0, denied: 0 };
+    // Multinomial split of tx into the three status buckets, with a touch of noise.
+    let sent   = Math.round(tx * r.status_mix.sent);
+    let denied = Math.round(tx * r.status_mix.denied);
+    let error  = Math.max(0, tx - sent - denied);
+    // Re-balance rounding so the buckets sum exactly.
+    if (sent + error + denied !== tx) error = Math.max(0, tx - sent - denied);
+    r.total_sent   += sent;
+    r.total_error  += error;
+    r.total_denied += denied;
+    return { sent, error, denied };
+  });
+
   // Feature-signal vector: archetype top-K features with per-ring strength.
   const profile = ARCH_FEATURE_PROFILE[r.arch];
   r.feature_signal = profile.top.map((f, i) => ({
@@ -618,6 +664,8 @@ const NAV = [
   { id: 'coverage',  title: 'Model coverage', kind: 'direct',
     badge: String(RINGS.filter(r => r.model_auc < 0.6).length), badgeKind: 'bad' },
   { id: 'signals',   title: 'Feature signals', kind: 'direct' },
+  { id: 'status',    title: 'Transaction status', kind: 'direct',
+    badge: 'live', badgeKind: 'accent' },
   { id: 'overlap',   title: 'Cross-ring overlap', kind: 'direct',
     badge: String(SHARED_DEVS + SHARED_IPS), badgeKind: 'warn' },
   { id: 'growth',    title: 'Growth & decay', kind: 'direct' },
@@ -682,6 +730,22 @@ ROUTES['overview'] = () => {
     showlegend: false,
   })), baseLayout({ yaxis: { title: 'tx / day' }, height: 360 }), CFG);
   m.appendChild(r2t);
+
+  // Daily transaction status across the whole portfolio
+  const cTxStatus = chartCard('Daily transaction status across all rings',
+    'Stacked: sent / error / denied. The gray (error) layer is dominated by card-testing rings; the red (denied) layer is the policy doing its job. Visit the dedicated Transaction status page for per-archetype and per-ring breakdowns.');
+  m.appendChild(cTxStatus.wrap);
+  const portfolioStatus = {};
+  STATUS_KEYS.forEach(s => {
+    portfolioStatus[s] = dates.map((_, di) =>
+      RINGS.reduce((sum, r) => sum + ((r.daily_status_counts[di] || {})[s] || 0), 0)
+    );
+  });
+  Plotly.newPlot(cTxStatus.plot, STATUS_KEYS.map(s => ({
+    x: dates, y: portfolioStatus[s], type: 'scatter', mode: 'lines',
+    name: STATUS_LABEL[s], stackgroup: 'one',
+    line: { width: 0 }, fillcolor: STATUS_COLORS[s],
+  })), baseLayout({ yaxis: { title: 'transactions / day' }, height: 320 }), CFG);
 
   // Model coverage by archetype
   const cCov = chartCard('Model AUC and recall @ 2% by archetype',
@@ -1001,6 +1065,22 @@ ROUTES['focus'] = (params) => {
     height: 300,
   }), CFG);
 
+  // Per-ring transaction status timeline
+  const cStatus = chartCard(`Daily transaction status — ${ring.id}`,
+    `Status fingerprint: ${(ring.status_mix.sent * 100).toFixed(0)}% sent / ${(ring.status_mix.error * 100).toFixed(0)}% error / ${(ring.status_mix.denied * 100).toFixed(0)}% denied. Compare to the archetype baseline of ${(ARCH_STATUS_MIX[ring.arch].sent * 100).toFixed(0)}% / ${(ARCH_STATUS_MIX[ring.arch].error * 100).toFixed(0)}% / ${(ARCH_STATUS_MIX[ring.arch].denied * 100).toFixed(0)}%.`);
+  m.appendChild(cStatus.wrap);
+  Plotly.newPlot(cStatus.plot, STATUS_KEYS.map(s => ({
+    x: dates,
+    y: ring.daily_status_counts.map(c => c[s] || 0),
+    type: 'scatter', mode: 'lines', name: STATUS_LABEL[s],
+    stackgroup: 'one', line: { width: 0 }, fillcolor: STATUS_COLORS[s],
+  })), baseLayout({
+    yaxis: { title: 'transactions / day' }, height: 280,
+    shapes: [{ type: 'line', xref: 'x', yref: 'paper',
+               x0: dates[ring.peak_day], x1: dates[ring.peak_day],
+               y0: 0, y1: 1, line: { color: '#ef4444', width: 1, dash: 'dash' } }],
+  }), CFG);
+
   // Feature signals for this ring
   const cFS = chartCard('Top features lighting up on this ring',
     'Per-ring feature signal strengths derived from the archetype profile and per-ring noise. These are the features the production model leans on most when it does catch this ring.');
@@ -1161,6 +1241,27 @@ ROUTES['archetype'] = () => {
     showlegend: false, height: 320,
   }), CFG);
   m.appendChild(r2);
+
+  // Per-archetype status mix
+  const cMix = chartCard('Status mix by archetype',
+    'Each archetype\'s sent/error/denied fingerprint, aggregated across all its rings. Card-testing pops as the only archetype with majority error+denied traffic; bust-out and first-party are visually identical to legit traffic at this layer.');
+  m.appendChild(cMix.wrap);
+  const archMix = archOrder.map(a => {
+    const rs = RINGS.filter(r => r.arch === a);
+    const t = { sent: 0, error: 0, denied: 0 };
+    rs.forEach(r => { t.sent += r.total_sent; t.error += r.total_error; t.denied += r.total_denied; });
+    const tot = t.sent + t.error + t.denied || 1;
+    return { a, sent: t.sent / tot, error: t.error / tot, denied: t.denied / tot };
+  });
+  Plotly.newPlot(cMix.plot, STATUS_KEYS.map(s => ({
+    x: archMix.map(d => ARCH_LABEL[d.a]),
+    y: archMix.map(d => d[s]),
+    type: 'bar', name: STATUS_LABEL[s], marker: { color: STATUS_COLORS[s] },
+  })), baseLayout({
+    barmode: 'stack',
+    yaxis: { tickformat: '.0%', range: [0, 1] },
+    height: 340, xaxis: { tickangle: -25 },
+  }), CFG);
 
   // Description table
   const tblWrap = el('div', 'chart-wrap');
@@ -1402,6 +1503,162 @@ ROUTES['signals'] = () => {
 
   m.appendChild(makeCallout('Reading this together with model coverage',
     `Archetypes with low model AUC (refund, first-party, friendly) tend to have signal vectors that overlap with archetypes the model already handles — meaning the existing features can\'t separate them. New feature investment should target the archetype-specific signatures: chargeback ratios for refund/friendly, origination/repayment features for first-party, merchant-onboarding telemetry for triangulation.`,
+    'info'));
+};
+
+/* -------------------- TRANSACTION STATUS -------------------- */
+ROUTES['status'] = () => {
+  const m = main();
+  m.appendChild(pageHeader(
+    'Transaction status',
+    `Every transaction completes in one of three terminal states — <span class="pill pill-good">sent</span> (completed), <span class="pill" style="background:#e2e8f0;color:#475569">error</span> (issuer/system failure), or <span class="pill pill-bad">denied</span> (blocked by policy or model). Status mix is one of the most operationally diagnostic signals you have: a card-testing ring is a 16/55/29 sent/error/denied fingerprint, while bust-out is 93/2/5 — visually identical to legitimate traffic until the bust day. This page tracks the mix portfolio-wide, per-archetype, and per-ring.`
+  ));
+
+  // Portfolio totals across all rings
+  const totSent   = RINGS.reduce((s, r) => s + r.total_sent, 0);
+  const totError  = RINGS.reduce((s, r) => s + r.total_error, 0);
+  const totDenied = RINGS.reduce((s, r) => s + r.total_denied, 0);
+  const totAll = totSent + totError + totDenied;
+
+  const kpis = el('div', 'kpis');
+  kpis.innerHTML = `
+    <div class="kpi" style="border-left:3px solid ${STATUS_COLORS.sent}"><div class="kpi-l">Sent</div><div class="kpi-v">${fmtN(totSent)}</div><div class="kpi-s">${fmtP(totSent / totAll)} of ring traffic</div></div>
+    <div class="kpi" style="border-left:3px solid ${STATUS_COLORS.error}"><div class="kpi-l">Error</div><div class="kpi-v">${fmtN(totError)}</div><div class="kpi-s">${fmtP(totError / totAll)}</div></div>
+    <div class="kpi" style="border-left:3px solid ${STATUS_COLORS.denied}"><div class="kpi-l">Denied</div><div class="kpi-v">${fmtN(totDenied)}</div><div class="kpi-s">${fmtP(totDenied / totAll)}</div></div>
+    <div class="kpi kpi-accent"><div class="kpi-l">Card-testing share</div><div class="kpi-v">${fmtP(RINGS.filter(r => r.arch === 'card_test').reduce((s, r) => s + r.total_sent + r.total_error + r.total_denied, 0) / totAll)}</div><div class="kpi-s">% of all ring transactions</div></div>
+  `;
+  m.appendChild(kpis);
+
+  // Daily portfolio status timeline (stacked area)
+  const cTime = chartCard('Daily transaction status — portfolio total',
+    'All ring transactions per day, decomposed into sent/error/denied. Spikes in the gray (error) layer are typically card-testing campaigns; rising red (denied) means the policy is biting harder.');
+  m.appendChild(cTime.wrap);
+  const portfolioByStatus = {};
+  STATUS_KEYS.forEach(s => {
+    portfolioByStatus[s] = dates.map((_, di) =>
+      RINGS.reduce((sum, r) => sum + ((r.daily_status_counts[di] || {})[s] || 0), 0)
+    );
+  });
+  Plotly.newPlot(cTime.plot, STATUS_KEYS.map(s => ({
+    x: dates, y: portfolioByStatus[s], type: 'scatter', mode: 'lines',
+    name: STATUS_LABEL[s], stackgroup: 'one',
+    line: { width: 0 }, fillcolor: STATUS_COLORS[s],
+  })), baseLayout({
+    yaxis: { title: 'transactions / day' }, height: 360,
+  }), CFG);
+
+  // Daily status share (normalized) — what fraction of each day was each status
+  const cShare = chartCard('Daily status share — normalized',
+    'Same data renormalized to 100%. Trend changes here are operationally meaningful: a sustained denied-share rise means policy tightened or attacks accelerated; a rising error share is a card-testing surge.');
+  m.appendChild(cShare.wrap);
+  const dailyTotals = dates.map((_, di) =>
+    STATUS_KEYS.reduce((s, k) => s + portfolioByStatus[k][di], 0));
+  Plotly.newPlot(cShare.plot, STATUS_KEYS.map(s => ({
+    x: dates,
+    y: portfolioByStatus[s].map((v, di) => dailyTotals[di] > 0 ? v / dailyTotals[di] : 0),
+    type: 'scatter', mode: 'lines',
+    name: STATUS_LABEL[s], stackgroup: 'pct', groupnorm: 'percent',
+    line: { width: 0 }, fillcolor: STATUS_COLORS[s],
+  })), baseLayout({
+    yaxis: { title: 'share', tickformat: '.0%' }, height: 320,
+  }), CFG);
+
+  // Per-archetype status fingerprint (horizontal stacked bars)
+  const cArch = chartCard('Status mix by archetype',
+    'Every archetype has a distinct status signature. Card-testing is unmistakable. Bust-out and first-party look like legitimate traffic from this view alone — that is exactly why they are hard to detect at the policy layer.');
+  m.appendChild(cArch.wrap);
+  const archMixData = ARCH_ORDER.map(a => {
+    const rs = RINGS.filter(r => r.arch === a);
+    const t = { sent: 0, error: 0, denied: 0 };
+    rs.forEach(r => { t.sent += r.total_sent; t.error += r.total_error; t.denied += r.total_denied; });
+    const tot = t.sent + t.error + t.denied || 1;
+    return { a, sent: t.sent / tot, error: t.error / tot, denied: t.denied / tot, totalTx: tot };
+  });
+  Plotly.newPlot(cArch.plot, STATUS_KEYS.map(s => ({
+    x: archMixData.map(d => d[s]),
+    y: archMixData.map(d => ARCH_LABEL[d.a]),
+    type: 'bar', orientation: 'h', name: STATUS_LABEL[s],
+    marker: { color: STATUS_COLORS[s] },
+    text: archMixData.map(d => (d[s] * 100).toFixed(0) + '%'),
+    textposition: 'inside',
+    hovertemplate: '<b>%{y}</b><br>' + STATUS_LABEL[s] + ': %{x:.1%}<extra></extra>',
+  })), baseLayout({
+    barmode: 'stack',
+    xaxis: { tickformat: '.0%', range: [0, 1] },
+    yaxis: { autorange: 'reversed' },
+    height: 380, margin: { t: 20, r: 40, b: 46, l: 140 },
+  }), CFG);
+
+  // Per-archetype daily denied rate over time (lines)
+  const cDeniedTrend = chartCard('Daily denied-rate trend by archetype',
+    'How much of each archetype\'s daily volume gets blocked. Rising lines mean the policy is starting to recognize the archetype. Flat low lines (e.g., bust-out) are the expected blind spots.');
+  m.appendChild(cDeniedTrend.wrap);
+  Plotly.newPlot(cDeniedTrend.plot, ARCH_ORDER.map(a => {
+    const rs = RINGS.filter(r => r.arch === a);
+    return {
+      x: dates,
+      y: dates.map((_, di) => {
+        let tx = 0, denied = 0;
+        rs.forEach(r => {
+          const c = r.daily_status_counts[di] || {};
+          tx += (c.sent || 0) + (c.error || 0) + (c.denied || 0);
+          denied += c.denied || 0;
+        });
+        return tx > 0 ? denied / tx : null;
+      }),
+      type: 'scatter', mode: 'lines', name: ARCH_LABEL[a],
+      line: { color: COLORS[a], width: 2 }, connectgaps: false,
+    };
+  }), baseLayout({
+    yaxis: { title: 'denied rate', tickformat: '.0%' },
+    height: 340,
+  }), CFG);
+
+  // Top "leaks": rings with high sent rate AND high $ (sent past the policy)
+  const leaky = [...RINGS].sort((a, b) => (b.status_mix.sent * b.$exp) - (a.status_mix.sent * a.$exp)).slice(0, 20);
+  // And top "noise": rings with high error+denied (most policy-handled)
+  const noisy = [...RINGS].sort((a, b) => ((b.status_mix.error + b.status_mix.denied) * (b.total_sent + b.total_error + b.total_denied)) - ((a.status_mix.error + a.status_mix.denied) * (a.total_sent + a.total_error + a.total_denied))).slice(0, 20);
+
+  const r2 = el('div', 'row2');
+  const cLeak = chartCard('Top 20 "leaky" rings — high sent-rate × high $',
+    'High sent rate means policy isn\'t catching them; high $ means each pass-through is expensive. Click any row to drill into ring focus.');
+  r2.appendChild(cLeak.wrap);
+  const tblL = el('table', 'rt-tbl');
+  tblL.innerHTML = `
+    <thead><tr><th>Ring</th><th>Arch</th><th>Sent %</th><th>Denied %</th><th>$ exp</th></tr></thead>
+    <tbody>${leaky.map(r => `
+      <tr data-ring="${r.id}">
+        <td><span class="ring-id">${r.id}</span></td>
+        <td>${archPill(r.arch)}</td>
+        <td>${(r.status_mix.sent * 100).toFixed(0)}%</td>
+        <td>${(r.status_mix.denied * 100).toFixed(0)}%</td>
+        <td>${fmt$(r.$exp)}</td>
+      </tr>`).join('')}</tbody>`;
+  cLeak.wrap.appendChild(tblL);
+  cLeak.plot.style.display = 'none';
+  tblL.querySelectorAll('tr[data-ring]').forEach(tr => tr.onclick = () => navigate('focus', { r: tr.dataset.ring }));
+
+  const cNoise = chartCard('Top 20 "noisy" rings — high error+denied volume',
+    'These rings generate the most policy events. High denied is good (the system is doing its job); high error is often a system-health canary or a card-testing fingerprint.');
+  r2.appendChild(cNoise.wrap);
+  const tblN = el('table', 'rt-tbl');
+  tblN.innerHTML = `
+    <thead><tr><th>Ring</th><th>Arch</th><th>Error %</th><th>Denied %</th><th>Total tx</th></tr></thead>
+    <tbody>${noisy.map(r => `
+      <tr data-ring="${r.id}">
+        <td><span class="ring-id">${r.id}</span></td>
+        <td>${archPill(r.arch)}</td>
+        <td>${(r.status_mix.error * 100).toFixed(0)}%</td>
+        <td>${(r.status_mix.denied * 100).toFixed(0)}%</td>
+        <td>${fmtN(r.total_sent + r.total_error + r.total_denied)}</td>
+      </tr>`).join('')}</tbody>`;
+  cNoise.wrap.appendChild(tblN);
+  cNoise.plot.style.display = 'none';
+  tblN.querySelectorAll('tr[data-ring]').forEach(tr => tr.onclick = () => navigate('focus', { r: tr.dataset.ring }));
+  m.appendChild(r2);
+
+  m.appendChild(makeCallout('Why this page is the operations counterpart to model coverage',
+    `<strong>Model coverage</strong> tells you what the model could catch in principle (per-ring AUC). <strong>Transaction status</strong> tells you what the policy actually catches in practice (per-ring denied %). They diverge: a ring with high AUC but low denied means the model knows but the policy threshold isn\'t set to act. A ring with low AUC and high denied means the policy is firing on something else — usually a non-model rule. Triaging both views together points to either a threshold change, a new rule, or a feature investment.`,
     'info'));
 };
 
